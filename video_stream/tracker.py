@@ -5,7 +5,7 @@ import numpy as np
 
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
-from pipeline import PipeBlock
+from pipeline import ThreadedPipeBlock
 
 from munkres import Munkres
 
@@ -23,10 +23,10 @@ def transpose_matrix(matrix):
     return list(map(list, zip(*matrix)))
 
 
-class Tracker(PipeBlock):
+class Tracker(ThreadedPipeBlock):
 
     def __init__(self, area_of_detection, info, output=None):
-        super().__init__(output, number_of_inputs=TRACKER_INPUTS)
+        super().__init__(output)
 
         self.new_positions = []
         self.old_positions = []
@@ -37,26 +37,18 @@ class Tracker(PipeBlock):
 
         self._optical_flow = OpticalFlow()
 
-        self._thread = Thread(target=self._run)
-        self._thread.daemon = True
-        self._thread.start()
+    def _step(self, seq):
+        if seq % OPTICAL_FLOW_PAUSE == 0:
 
-    def _run(self):
-        sequence_number = 0
-        while True:
-            sequence_number += 1
+            _, new_frame = self.next(pipe=IMAGE_PIPE)
+            self._optical_flow.update(new_frame)
 
-            if sequence_number % OPTICAL_FLOW_PAUSE == 0:
+        if seq % APROXIMATION_FRAME_COUNT == 0:
+            self._update_from_detector(seq)
+        else:
+            self._update_from_predictor(seq)
 
-                _, new_frame = self.next(pipe=IMAGE_PIPE)
-                self._optical_flow.update(new_frame)
-
-            if sequence_number % APROXIMATION_FRAME_COUNT == 0:
-                self._update_from_detector(sequence_number)
-            else:
-                self._update_from_predictor(sequence_number)
-
-            self._control_boxes()
+        self._control_boxes()
 
     def _update_from_detector(self, sequence_number) -> None:
 
@@ -72,7 +64,7 @@ class Tracker(PipeBlock):
 
         else:
             Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
-            self.send_to((sequence_number, [box.serialize() for box in Box2D.boxes], [], []), out_pipe=0, in_pipe=1)
+            self.send_to((sequence_number, [box.serialize() for box in Box2D.boxes], ([], [])), out_pipe=0, in_pipe=1)
 
     def _update_from_predictor(self, sequence_number) -> None:
 
@@ -86,10 +78,7 @@ class Tracker(PipeBlock):
 
             self.send_to((sequence_number, [box.serialize() for box in Box2D.boxes], self._optical_flow.serialize()), out_pipe=0, in_pipe=1)
         else:
-            self.send_to((sequence_number, [], [], []), out_pipe=0, in_pipe=1)
-
-    def __str__(self):
-        return super().__str__() + f'Boxes [{len(Box2D.boxes)}]'
+            self.send_to((sequence_number, [], ([], [])), out_pipe=0, in_pipe=1)
 
     def _hungarian_method(self, detected_boxes) -> None:
 

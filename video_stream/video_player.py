@@ -1,7 +1,5 @@
 import time
-from queue import Queue
 import cv2
-import numpy as np
 
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
@@ -11,8 +9,6 @@ from pipeline import PipeBlock
 class VideoPlayer(PipeBlock):
     def __init__(self, area_of_detection, info):
         super().__init__()
-
-        self._input = [Queue(20), Queue(20)]
 
         self._detector = None
         self._loader = None
@@ -43,17 +39,17 @@ class VideoPlayer(PipeBlock):
             mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
 
             cv2.imshow("image", cv2.add(image, mask))
-            key = cv2.waitKey(30)
+            key = cv2.waitKey(0)
 
             #  commands
             if key & 0xFF == ord("q"):
                 break
 
             elif key & 0xFF == ord("d"):
-                self._tracker.switch_tracking()
+                self._info.track_boxes = not self._info.track_boxes
 
             if frame_counter > 100:
-                print("FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000), self._detector, self._loader)
+                print("FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000), self, self._detector, self._loader, self._tracker)
 
                 frame_counter = 0
                 clock = time.time()

@@ -1,1 +1,1 @@
-from .pipeline import PipeBlock
+from .pipeline import PipeBlock, ThreadedPipeBlock

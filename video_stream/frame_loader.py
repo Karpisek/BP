@@ -1,13 +1,12 @@
 import cv2
-from threading import Thread
 
-from pipeline import PipeBlock
+from pipeline import ThreadedPipeBlock
 from .tracker import APROXIMATION_FRAME_COUNT, OPTICAL_FLOW_PAUSE
 
 IMAGE_WIDTH_FOR_CNN = 900
 
 
-class FrameLoader(PipeBlock):
+class FrameLoader(ThreadedPipeBlock):
     def __init__(self, path, output, input_info):
         """
         Loads frames from given path and saves them in Queue
@@ -20,36 +19,28 @@ class FrameLoader(PipeBlock):
         self._tape = cv2.VideoCapture(path)
         self.set_info(input_info)
 
-        self._thread = Thread(target=self._run, args=(path, ))
-        self._thread.daemon = True
-        self._thread.start()
-
-        pass
-
-    def _run(self, path):
+    def _step(self, seq):
         """
         runs until are images in input stream
         saves them to queue
         :return: none
         """
 
-        seq = 0
-        while True:
-            seq += 1
-            _, image = self._tape.read()
+        seq += 1
+        _, image = self._tape.read()
 
-            self.send_to((seq, image), out_pipe=1)
+        self.send_to((seq, image), out_pipe=1)
 
-            if seq % OPTICAL_FLOW_PAUSE == 0:
-                self.send_to((seq, image), out_pipe=2, in_pipe=1)
+        if seq % OPTICAL_FLOW_PAUSE == 0:
+            self.send_to((seq, image), out_pipe=2, in_pipe=1)
 
-            if seq % APROXIMATION_FRAME_COUNT == 0:
+        if seq % APROXIMATION_FRAME_COUNT == 0:
 
-                height, width, _ = image.shape
-                scale = height / width
-                image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
+            height, width, _ = image.shape
+            scale = height / width
+            image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
 
-                self.send_to((seq, image), out_pipe=0)
+            self.send_to((seq, image), out_pipe=0)
 
 
 

@@ -32,6 +32,20 @@ KALMAN_MESUREMENT_FLOW_MATRIX = np.array([
     [0, 0, 0, 1]
 ], np.float32)
 
+KALMAN_PROCESS_NOISE_COV = np.array([
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, 1],
+], np.float32) * 0.5
+
+KALMAN_MESUREMENT_NOISE_COV = np.array([
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 0.3, 0],
+    [0, 0, 0, 0.3],
+], np.float32) * 30
+
 
 class Box2D:
 
@@ -39,7 +53,7 @@ class Box2D:
     boxes = []
 
     MAX_LIFETIME = 25
-    MINIMAL_SCORE_CORRECTION = 0.5
+    MINIMAL_SCORE_CORRECTION = 0.3
     MINIMAL_SCORE_NEW = 0.7
 
     @staticmethod
@@ -74,19 +88,9 @@ class Box2D:
 
         self._kalman.transitionMatrix = KALMAN_TRANSITION_MATRIX
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
-        self._kalman.processNoiseCov = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1],
-        ], np.float32) * 0.5
+        self._kalman.processNoiseCov = KALMAN_PROCESS_NOISE_COV
 
-        self._kalman.measurementNoiseCov = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 0, 0.1, 0],
-            [0, 0, 0, 0.1],
-        ], np.float32) * 30
+        self._kalman.measurementNoiseCov = KALMAN_MESUREMENT_NOISE_COV
 
         self._kalman.statePost = np.array([
             [np.float32(coordinates.x)],  # x-coord
@@ -145,7 +149,7 @@ class Box2D:
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
-        return int(diagonal/2)
+        return int(2*diagonal/3)
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
         return self.left_anchor, self.right_anchor, self.center.tuple(), self.tracker
@@ -196,7 +200,7 @@ class Box2D:
 
         diagonal = np.sqrt(width * width + height * height)
 
-        max_pixels = diagonal/2
+        max_pixels = 2*diagonal/3
 
         return self.center.distance(new_coordinates) < max_pixels
 
@@ -228,7 +232,4 @@ class Box2D:
 
     def serialize(self):
         return self.anchors(), self.area_of_interest(), self.car_info, self.velocity
-
-    def __del__(self):
-        print(f"deleting {self.id}, {self.center}")
 

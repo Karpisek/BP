@@ -16,7 +16,7 @@ class Calibrator(PipeBlock):
         self._thread.daemon = True
         self._thread.start()
 
-    def _run(self):
+    def _run(self, seq):
 
         # searches for vanishing points
         print("Search for VP begins")

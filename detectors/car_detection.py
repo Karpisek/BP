@@ -1,32 +1,19 @@
 import tensorflow as tf
 import numpy as np
 
-from queue import Queue
-from threading import Thread
-
-from bbox import Box2D
-from bbox.coordinates import Coordinates
-from bbox.size import ObjectSize
-from pipeline import PipeBlock
+from bbox import Box2D, ObjectSize, Coordinates
+from pipeline import ThreadedPipeBlock
 
 
-class Detector(PipeBlock):
+class Detector(ThreadedPipeBlock):
 
     def __init__(self, model, detection_area, output=None):
 
         super().__init__(output)
 
-        self._input = [Queue(20)]
-
         self.detection_area = detection_area
 
         self.detection_graph = tf.Graph()
-
-        self._thread = Thread(target=self._run, args=(model,))
-        self._thread.daemon = True
-        self._thread.start()
-
-    def _run(self, model):
 
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
@@ -43,18 +30,18 @@ class Detector(PipeBlock):
             self.num_d = self.detection_graph.get_tensor_by_name('num_detections:0')
         self.sess = tf.Session(graph=self.detection_graph)
 
-        while True:
-            seq, image = self.next()
+    def _step(self, seq):
+        seq, image = self.next()
 
-            img_expanded = np.expand_dims(image, axis=0)
+        img_expanded = np.expand_dims(image, axis=0)
 
-            (boxes, scores, classes, num) = self.sess.run(
-                [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
-                feed_dict={self.image_tensor: img_expanded})
+        (boxes, scores, classes, num) = self.sess.run(
+            [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
+            feed_dict={self.image_tensor: img_expanded})
 
-            packet_boxes = self.parse_boxes(boxes, scores)
+        packet_boxes = self.parse_boxes(boxes, scores)
 
-            self.send_to_all(packet_boxes, pipe=0)
+        self.send_to_all(packet_boxes, pipe=0)
 
     def parse_boxes(self, boxes, scores):
 
