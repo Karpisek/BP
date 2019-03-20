@@ -42,9 +42,9 @@ KALMAN_PROCESS_NOISE_COV = np.array([
 KALMAN_MESUREMENT_NOISE_COV = np.array([
     [1, 0, 0, 0],
     [0, 1, 0, 0],
-    [0, 0, 0.3, 0],
-    [0, 0, 0, 0.3],
-], np.float32) * 30
+    [0, 0, .05, 0],
+    [0, 0, 0, .05],
+], np.float32) * 40
 
 
 class Box2D:
@@ -53,8 +53,8 @@ class Box2D:
     boxes = []
 
     MAX_LIFETIME = 25
-    MINIMAL_SCORE_CORRECTION = 0.3
-    MINIMAL_SCORE_NEW = 0.7
+    MINIMAL_SCORE_CORRECTION = 0.5
+    MINIMAL_SCORE_NEW = 0.8
 
     @staticmethod
     def draw(image, anchors, area_of_interest, car_info, flow_diff) -> None:
@@ -149,7 +149,15 @@ class Box2D:
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
-        return int(2*diagonal/3)
+        return int(diagonal/2)
+
+    def inner_area(self) -> int:
+        width = self.size.width
+        height = self.size.height
+
+        diagonal = np.sqrt(width * width + height * height)
+
+        return int(diagonal/2) if int(diagonal/2) < 20 else 20
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
         return self.left_anchor, self.right_anchor, self.center.tuple(), self.tracker
@@ -200,7 +208,7 @@ class Box2D:
 
         diagonal = np.sqrt(width * width + height * height)
 
-        max_pixels = 2*diagonal/3
+        max_pixels = diagonal/2
 
         return self.center.distance(new_coordinates) < max_pixels
 
@@ -229,6 +237,13 @@ class Box2D:
             return global_dx/number_of_flows, global_dy/number_of_flows
         else:
             return 0, 0
+
+    def mask(self, image) -> np.ndarray:
+        mask = np.zeros_like(image)
+
+        cv2.circle(mask, self.center.tuple(), self.inner_area(), 255, -1)
+
+        return mask
 
     def serialize(self):
         return self.anchors(), self.area_of_interest(), self.car_info, self.velocity
