@@ -1,12 +1,15 @@
 from queue import Queue
 
+DEFAULT_NUMBER_INPUTS = 1
+DEFAULT_QUEUE_SIZE = 20
+
 
 class PipeBlock:
     _output = []
 
-    def __init__(self, output=None):
+    def __init__(self, output=None, number_of_inputs=DEFAULT_NUMBER_INPUTS, queue_size=DEFAULT_QUEUE_SIZE):
         self._output = output
-        self._input = [Queue(20)]
+        self._input = [Queue(queue_size) for _ in range(number_of_inputs)]
 
     def send_to_all(self, message, pipe=0):
         if self._output is None:

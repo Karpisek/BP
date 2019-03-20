@@ -9,6 +9,7 @@ from pipeline import PipeBlock
 from munkres import Munkres
 
 DISALLOWED = 10000
+TRACKER_INPUTS = 2
 
 APROXIMATION_FRAME_COUNT = 2
 OPTICAL_FLOW_PAUSE = 3
@@ -29,10 +30,9 @@ def transpose_matrix(matrix):
 
 class Tracker(PipeBlock):
 
-    def __init__(self, area_of_detection, info, output=None):
-        super().__init__(output)
+    def __init__(self, area_of_detection, info, output=None, track_boxes=True):
+        super().__init__(output, number_of_inputs=TRACKER_INPUTS)
 
-        self._input = [Queue(20), Queue(20)]
         self.new_positions = []
         self.old_positions = []
 
@@ -40,7 +40,7 @@ class Tracker(PipeBlock):
         self._info = info
         self._points_to_track = None
 
-        self._track_boxes = True
+        self._track_boxes = track_boxes
 
         self._optical_flow_grey = None
 
@@ -59,8 +59,8 @@ class Tracker(PipeBlock):
             if sequence_number % APROXIMATION_FRAME_COUNT == 0:
                 self._update_from_detector(sequence_number)
             else:
-                # self._update_from_predictor()
                 self._update_from_predictor(sequence_number)
+
             self._control_boxes()
 
     def _update_from_detector(self, sequence_number):
@@ -146,7 +146,7 @@ class Tracker(PipeBlock):
             if not self._area_of_detection.contains(box.center):
                 Box2D.boxes.remove(box)
 
-    def switch(self):
+    def switch_tracking(self):
         self._track_boxes = not self._track_boxes
 
     def _update_flow(self):

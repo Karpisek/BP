@@ -38,8 +38,7 @@ class VideoPlayer(PipeBlock):
             tracker_seq, boxes, old_positions, new_positions = self.next(pipe=1)
             mask = np.zeros_like(image)
 
-            for serialized_box in boxes:
-                Box2D.draw(image, *serialized_box, center=True)
+            [Box2D.draw(image, *serialized_box, center=True) for serialized_box in boxes]
 
             self._area_of_detection.draw(image)
 
@@ -51,11 +50,12 @@ class VideoPlayer(PipeBlock):
             cv2.imshow("image", cv2.add(image, mask))
             key = cv2.waitKey(20)
 
+            #  commands
             if key & 0xFF == ord("q"):
                 break
 
             elif key & 0xFF == ord("d"):
-                self._tracker.switch()
+                self._tracker.switch_tracking()
 
             if frame_counter > 100:
                 print("FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000), self._detector, self._loader)
