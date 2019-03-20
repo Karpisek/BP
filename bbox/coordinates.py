@@ -26,7 +26,7 @@ class Coordinates:
         self.x = x
         self.y = y
 
-    def tuple(self):
+    def tuple(self) -> (int, int):
         return self.x, self.y
 
     @staticmethod

@@ -4,9 +4,8 @@ import cv2
 import numpy as np
 
 from bbox import Box2D
+from bbox.optical_flow import OpticalFlow
 from pipeline import PipeBlock
-
-color = np.random.randint(0, 255, (10000, 3))
 
 
 class VideoPlayer(PipeBlock):
@@ -35,20 +34,16 @@ class VideoPlayer(PipeBlock):
         self._area_of_detection.select(cv2.selectROI("image", image), self._info)
 
         while True:
-            tracker_seq, boxes, old_positions, new_positions = self.next(pipe=1)
-            mask = np.zeros_like(image)
+            tracker_seq, boxes, serialized_optical_flow = self.next(pipe=1)
 
-            [Box2D.draw(image, *serialized_box, center=True) for serialized_box in boxes]
+            [Box2D.draw(image, *serialized_box) for serialized_box in boxes]
 
             self._area_of_detection.draw(image)
 
-            for i, (new, old) in enumerate(zip(new_positions, old_positions)):
-                a, b = new.ravel()
-                c, d = old.ravel()
-                cv2.line(mask, (a, b), (c, d), color[i].tolist(), 1)
+            mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
 
             cv2.imshow("image", cv2.add(image, mask))
-            key = cv2.waitKey(20)
+            key = cv2.waitKey(30)
 
             #  commands
             if key & 0xFF == ord("q"):

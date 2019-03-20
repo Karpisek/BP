@@ -38,11 +38,22 @@ class Box2D:
     id_counter = 0
     boxes = []
 
-    LIFETIME = 25
-    MINIMAL_SCORE_CORRECTION = 0.3
+    MAX_LIFETIME = 25
+    MINIMAL_SCORE_CORRECTION = 0.5
     MINIMAL_SCORE_NEW = 0.7
 
-    # SIMILARITY_THRESHOLD = 50  # smaller side
+    @staticmethod
+    def draw(image, anchors, area_of_interest, car_info, flow_diff) -> None:
+
+        top_left, bot_right, center_point, tracker = anchors
+
+        cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
+        cv2.putText(image, car_info, top_left, 1, 1, COLOR_BLUE, 2)
+
+        dx, dy = flow_diff
+        x, y = center_point
+
+        cv2.line(image, center_point, (int(x + dx), int(y + dy)), COLOR_RED, 1)
 
     def __init__(self, coordinates, size, confident_score, info, tracker):
 
@@ -56,14 +67,10 @@ class Box2D:
 
         self.score = confident_score
 
-        self._corrected = False
         self._info = info
         self._kalman = cv2.KalmanFilter(4, 4)
 
-        print(self._kalman.measurementNoiseCov)
-        self.lifetime = Box2D.LIFETIME
-
-        # TODO finetune parametrs
+        self.lifetime = Box2D.MAX_LIFETIME
 
         self._kalman.transitionMatrix = KALMAN_TRANSITION_MATRIX
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
@@ -81,13 +88,6 @@ class Box2D:
             [0, 0, 0, 0.1],
         ], np.float32) * 30
 
-        # self._kalman.errorCovPost = np.array([
-        #     [1, 1, 1, 1],
-        #     [1, 1, 1, 1],
-        #     [1, 1, 1, 1],
-        #     [1, 1, 1, 1],
-        # ], np.float32) * 0.1
-
         self._kalman.statePost = np.array([
             [np.float32(coordinates.x)],  # x-coord
             [np.float32(coordinates.y)],  # y-coord
@@ -95,89 +95,66 @@ class Box2D:
             [np.float32(0)],  # dy
         ])
 
-        self.id = Box2D.id_counter
+        self._id = Box2D.id_counter
 
         Box2D.id_counter += 1
 
     @property
-    def center(self):
+    def id(self) -> int:
+        return self._id
+
+    @property
+    def center(self) -> (int, int):
         return Coordinates(int(self._kalman.statePost[0][0]), int(self._kalman.statePost[1][0]))
 
     @property
-    def size(self):
+    def size(self) -> (int, int):
         return self._object_size
 
     @property
-    def velocity(self):
+    def velocity(self) -> (int, int):
         return int(np.abs(self._kalman.statePost[2][0])), int(np.abs(self._kalman.statePost[3][0]))
 
     @property
-    def left_anchor(self):
+    def left_anchor(self) -> (int, int):
         x_min = int((self.center.x - self.size.width / 2))
         y_min = int((self.center.y - self.size.height / 2))
 
         return x_min, y_min
 
     @property
-    def right_anchor(self):
+    def right_anchor(self) -> (int, int):
         x_max = int((self.center.x + self.size.width / 2))
         y_max = int((self.center.y + self.size.height / 2))
 
         return x_max, y_max
 
     @property
-    def tracker(self):
+    def tracker(self) -> (int, int):
         x_tracker = int(self.center.x)
         y_tracker = int((self.center.y + self.size.height / 2))
 
         return x_tracker, y_tracker
 
     @property
-    def car_info(self):
-        return str(self.id)
+    def car_info(self) -> str:
+        return str(self._id)
 
-    @staticmethod
-    def draw(image, anchors, area_of_interest, car_info, flow_diff, color=COLOR_GREEN, center=False):
-        """
-        prints 2D box on given image
-        :param image: selected image to plot on
-        :param center: if should print the midle point of box
-        :return:
-        """
-
-        top_left, bot_right, center_point, tracker = anchors
-        # cv2.rectangle(image, top_left, bot_right, color, BOX_THICKNESS)
-
-        cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
-
-        # cv2.circle(image, tracker, CENTER_POINT_RADIUS, COLOR_RED, BOX_THICKNESS)
-
-        # if center:
-            # cv2.circle(image, center_point, CENTER_POINT_RADIUS, color, BOX_THICKNESS)
-
-        # cv2.putText(image, "{0:.3f}".format(dx), top_left, 1, 1, COLOR_BLUE, 2)
-        cv2.putText(image, car_info, top_left, 1, 1, COLOR_BLUE, 2)
-
-        dx, dy = flow_diff
-        x, y = center_point
-
-        cv2.line(image, center_point, (int(x+dx), int(y+dy)), COLOR_RED, 1)
-
-    def area_of_interest(self):
+    def area_of_interest(self) -> int:
         width = self.size.width
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
         return int(diagonal/2)
 
-    def anchors(self):
+    def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
         return self.left_anchor, self.right_anchor, self.center.tuple(), self.tracker
 
-    def predict(self):
+    def predict(self) -> None:
         self._kalman.predict()
         self.lifetime -= 1
 
-    def update_position(self, size, score, new_coordinates):
+    def update_position(self, size, score, new_coordinates) -> None:
 
         size.convert_to_fixed(self._info)
         new_coordinates.convert_to_fixed(info=self._info)
@@ -191,15 +168,14 @@ class Box2D:
 
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
         self._kalman.correct(mesurement)
-        self._corrected = True
 
         self.score = score
         self._object_size = size
 
-        self.lifetime = Box2D.LIFETIME
+        self.lifetime = Box2D.MAX_LIFETIME
 
-    def update_flow(self):
-        x_flow, y_flow = self.global_flow()
+    def update_flow(self, old_positions, new_positions) -> None:
+        x_flow, y_flow = self.extract_flow(old_positions, new_positions)
 
         mesurement = np.array([
             [np.float32(0)],
@@ -210,11 +186,10 @@ class Box2D:
 
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
-        self._corrected = True
 
-        self.lifetime = Box2D.LIFETIME
+        self.lifetime = Box2D.MAX_LIFETIME
 
-    def in_radius(self, new_coordinates):
+    def in_radius(self, new_coordinates) -> int:
 
         width = self.size.width
         height = self.size.height
@@ -225,13 +200,13 @@ class Box2D:
 
         return self.center.distance(new_coordinates) < max_pixels
 
-    def global_flow(self):
+    def extract_flow(self, old_positions, new_positions) -> (int, int):
 
         global_dx = 0
         global_dy = 0
 
         number_of_flows = 0
-        for flow in zip(self._parent_tracker.new_positions, self._parent_tracker.old_positions):
+        for flow in zip(new_positions, old_positions):
             new_pos, old_pos = flow
 
             if self.in_radius(Coordinates(*new_pos)):
@@ -252,9 +227,8 @@ class Box2D:
             return 0, 0
 
     def serialize(self):
-        return self.anchors(), self.area_of_interest(), self.car_info, self.global_flow()
+        return self.anchors(), self.area_of_interest(), self.car_info, self.velocity
 
     def __del__(self):
         print(f"deleting {self.id}, {self.center}")
-        pass
 
