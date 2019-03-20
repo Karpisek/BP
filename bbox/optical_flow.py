@@ -3,8 +3,8 @@ import numpy as np
 
 from bbox import Box2D
 
-LK_PARAMS = dict(winSize=(41, 41),
-                 maxLevel=4,
+LK_PARAMS = dict(winSize=(15, 15),
+                 maxLevel=6,
                  criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 FEATURE_PARAMS = dict(qualityLevel=0.3,
