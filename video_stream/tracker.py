@@ -1,8 +1,3 @@
-from queue import Queue
-from threading import Thread
-import cv2
-import numpy as np
-
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock

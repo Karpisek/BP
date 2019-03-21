@@ -13,7 +13,7 @@ FEATURE_PARAMS = dict(qualityLevel=0.3,
 
 MAX_OPTICAL_FEATURES = 150
 
-GRID_DENSITY = 7
+GRID_DENSITY = 10
 
 
 class OpticalFlow:
@@ -76,6 +76,7 @@ class OpticalFlow:
 
         self._previous_image = new_frame_gray
         self._features_to_track = np.zeros(shape=(0, 1, 2), dtype=np.float32)
+
         if len(Box2D.boxes):
             for box in Box2D.boxes:
 
@@ -88,6 +89,8 @@ class OpticalFlow:
 
             for box in Box2D.boxes:
                 box.update_flow(self._old_positions, self._new_positions)
+
+            self._features_to_track = np.unique(self._features_to_track, axis=0)
 
     def serialize(self) -> ([], []):
         return self._old_positions, self._new_positions

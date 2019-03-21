@@ -1,22 +1,17 @@
 from queue import Full
-from threading import Thread
-from pipeline import PipeBlock
+from pipeline import ThreadedPipeBlock
 
 import time
 
 
-class Calibrator(PipeBlock):
+class Calibrator(ThreadedPipeBlock):
     def __init__(self, output=None):
 
         super().__init__(output)
 
         self._vanishing_points = [VanishingPoint() for _ in range(3)]
 
-        self._thread = Thread(target=self._run)
-        self._thread.daemon = True
-        self._thread.start()
-
-    def _run(self, seq):
+    def _step(self, seq):
 
         # searches for vanishing points
         print("Search for VP begins")

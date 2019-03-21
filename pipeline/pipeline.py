@@ -6,7 +6,6 @@ DEFAULT_QUEUE_SIZE = 20
 
 
 class PipeBlock:
-    _output = []
 
     def __init__(self, output=None, queue_size=DEFAULT_QUEUE_SIZE):
         if output is not None:

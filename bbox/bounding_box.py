@@ -6,6 +6,7 @@ from bbox.coordinates import Coordinates
 COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (255, 0, 0)
 COLOR_RED = (0, 0, 255)
+COLOR_WHITE = (0, 0, 0)
 
 BOX_THICKNESS = 2
 CENTER_POINT_RADIUS = 2
@@ -40,11 +41,11 @@ KALMAN_PROCESS_NOISE_COV = np.array([
 ], np.float32) * 0.5
 
 KALMAN_MESUREMENT_NOISE_COV = np.array([
-    [1, 0, 0, 0],
-    [0, 1, 0, 0],
-    [0, 0, .05, 0],
-    [0, 0, 0, .05],
-], np.float32) * 40
+    [40, 0, 0, 0],
+    [0, 40, 0, 0],
+    [0, 0, .1, 0],
+    [0, 0, 0, .1],
+], np.float32) * 1
 
 
 class Box2D:
@@ -62,7 +63,8 @@ class Box2D:
         top_left, bot_right, center_point, tracker = anchors
 
         cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
-        cv2.putText(image, car_info, top_left, 1, 1, COLOR_BLUE, 2)
+
+        cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
 
         dx, dy = flow_diff
         x, y = center_point
