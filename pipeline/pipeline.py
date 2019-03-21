@@ -1,3 +1,4 @@
+import time
 from queue import Queue
 from threading import Thread
 
@@ -6,60 +7,68 @@ DEFAULT_QUEUE_SIZE = 20
 
 
 class PipeBlock:
-    _output = []
 
-    def __init__(self, output=None, queue_size=DEFAULT_QUEUE_SIZE):
+    def __init__(self, pipe_id, output=None, queue_size=DEFAULT_QUEUE_SIZE):
+        self.id = pipe_id
+
+        self._input = {}
+        self._output = {}
+
         if output is not None:
             for pipe in output:
-                pipe.add_input(queue_size)
-
-        self._output = output
-        self._input = []
+                pipe.connect(self, queue_size)
+                self._output[pipe.id] = pipe
 
     def start(self):
         raise NotImplementedError
 
-    def send_to_all(self, message, pipe=0):
-        if self._output is None:
-            raise NoOutputError
+    def send(self, message, pipe_id):
+        self._output[pipe_id].deliver(message, pipe_id=self.id)
 
-        [receiver.deliver(message, pipe=pipe) for receiver in self._output]
+    def deliver(self, message, pipe_id):
+        self._input[pipe_id].put(message)
 
-    def send_to(self, message, in_pipe=0, out_pipe=0):
-        self._output[out_pipe].deliver(message, pipe=in_pipe)
+    def receive(self, pipe_id):
+        return self._input[pipe_id].get()
 
-    def deliver(self, message, pipe=0):
-        self._input[pipe].put(message)
-
-    def next(self, pipe=0):
-        return self._input[pipe].get()
-
-    def next_nowait(self, pipe=0):
-        return self._input[pipe].get(False)
-
-    def add_input(self, queue_size):
-        self._input.append(Queue(queue_size))
+    def connect(self, sender, queue_size):
+        self._input[sender.id] = Queue(queue_size)
 
     def __str__(self):
-        return f"{self.__class__.__name__}: {[q.qsize() for q in self._input]}"
+        return f"{self.__class__.__name__}: {[queue.qsize() for key, queue in self._input.items()]}"
 
 
 class ThreadedPipeBlock(PipeBlock):
 
-    def __init__(self, output, args=None):
-        super().__init__(output)
+    def __init__(self, pipe_id, output=None):
+        super().__init__(pipe_id, output)
 
         self._thread = Thread(target=self._run)
         self._thread.daemon = True
+
+    @property
+    def stop(self):
+        return self._end
 
     def start(self):
         self._thread.start()
 
     def _run(self):
+        timer = time.time()
         seq = 0
+        frame_counter = 0
+
         while True:
+            frame_counter += 1
             seq += 1
+
             self._step(seq)
+
+            if seq % 100 == 0:
+                # print(f"{self.__class__.__name__} FPS: {1000 / (((time.time() - timer) / frame_counter) * 1000)}")
+
+                frame_counter = 0
+                timer = time.time()
 
     def _step(self, seq):
         raise NotImplementedError

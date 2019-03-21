@@ -3,12 +3,13 @@ import cv2
 
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
+from params import TRACKER_ID, FRAME_LOADER_ID, VIDEO_PLAYER_ID
 from pipeline import PipeBlock
 
 
 class VideoPlayer(PipeBlock):
     def __init__(self, area_of_detection, info):
-        super().__init__()
+        super().__init__(pipe_id=VIDEO_PLAYER_ID)
 
         self._detector = None
         self._loader = None
@@ -24,13 +25,13 @@ class VideoPlayer(PipeBlock):
         clock = time.time()
         frame_counter = 0
 
-        seq, image = self.next()
+        seq, image = self.receive(FRAME_LOADER_ID)
         frame_counter += 1
 
         self._area_of_detection.select(cv2.selectROI("image", image), self._info)
 
         while True:
-            tracker_seq, boxes, serialized_optical_flow = self.next(pipe=1)
+            tracker_seq, boxes, serialized_optical_flow = self.receive(pipe_id=TRACKER_ID)
 
             [Box2D.draw(image, *serialized_box) for serialized_box in boxes]
 
@@ -39,7 +40,7 @@ class VideoPlayer(PipeBlock):
             mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
 
             cv2.imshow("image", cv2.add(image, mask))
-            key = cv2.waitKey(10)
+            key = cv2.waitKey(1)
 
             #  commands
             if key & 0xFF == ord("q"):
@@ -54,7 +55,7 @@ class VideoPlayer(PipeBlock):
                 frame_counter = 0
                 clock = time.time()
 
-            seq, image = self.next()
+            seq, image = self.receive(FRAME_LOADER_ID)
             frame_counter += 1
 
         cv2.destroyAllWindows()
