@@ -46,10 +46,6 @@ class ThreadedPipeBlock(PipeBlock):
         self._thread = Thread(target=self._run)
         self._thread.daemon = True
 
-    @property
-    def stop(self):
-        return self._end
-
     def start(self):
         self._thread.start()
 
