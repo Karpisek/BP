@@ -1,5 +1,6 @@
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
+from params import FRAME_LOADER_ID, DETECTOR_ID, VIDEO_PLAYER_ID, TRACKER_ID
 from pipeline import ThreadedPipeBlock
 
 from munkres import Munkres
@@ -10,9 +11,6 @@ TRACKER_INPUTS = 2
 APROXIMATION_FRAME_COUNT = 3
 OPTICAL_FLOW_PAUSE = 3
 
-IMAGE_PIPE = 1
-DETECTOR_PIPE = 0
-
 
 def transpose_matrix(matrix):
     return list(map(list, zip(*matrix)))
@@ -21,7 +19,7 @@ def transpose_matrix(matrix):
 class Tracker(ThreadedPipeBlock):
 
     def __init__(self, area_of_detection, info, output=None):
-        super().__init__(output)
+        super().__init__(pipe_id=TRACKER_ID, output=output)
 
         self.new_positions = []
         self.old_positions = []
@@ -35,7 +33,7 @@ class Tracker(ThreadedPipeBlock):
     def _step(self, seq):
         if seq % OPTICAL_FLOW_PAUSE == 0:
 
-            _, new_frame = self.next(pipe=IMAGE_PIPE)
+            _, new_frame = self.receive(pipe_id=FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
 
         if seq % APROXIMATION_FRAME_COUNT == 0:
@@ -47,7 +45,7 @@ class Tracker(ThreadedPipeBlock):
 
     def _update_from_detector(self, sequence_number) -> None:
 
-        detected_boxes = self.next(pipe=DETECTOR_PIPE)
+        detected_boxes = self.receive(pipe_id=DETECTOR_ID)
 
         if self._info.track_boxes:
             self._update_from_predictor(sequence_number)
@@ -59,7 +57,7 @@ class Tracker(ThreadedPipeBlock):
 
         else:
             Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
-            self.send_to((sequence_number, [box.serialize() for box in Box2D.boxes], ([], [])), out_pipe=0, in_pipe=1)
+            self.send((sequence_number, [box.serialize() for box in Box2D.boxes], ([], [])), pipe_id=VIDEO_PLAYER_ID)
 
     def _update_from_predictor(self, sequence_number) -> None:
 
@@ -71,9 +69,9 @@ class Tracker(ThreadedPipeBlock):
             for box in Box2D.boxes:
                 box.predict()
 
-            self.send_to((sequence_number, [box.serialize() for box in Box2D.boxes], self._optical_flow.serialize()), out_pipe=0, in_pipe=1)
+            self.send((sequence_number, [box.serialize() for box in Box2D.boxes], self._optical_flow.serialize()), pipe_id=VIDEO_PLAYER_ID)
         else:
-            self.send_to((sequence_number, [], ([], [])), out_pipe=0, in_pipe=1)
+            self.send((sequence_number, [], ([], [])), pipe_id=VIDEO_PLAYER_ID)
 
     def _hungarian_method(self, detected_boxes) -> None:
 

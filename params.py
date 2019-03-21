@@ -1,0 +1,7 @@
+# pipeline block id's
+
+VIDEO_PLAYER_ID = 0
+FRAME_LOADER_ID = 1
+DETECTOR_ID = 2
+TRACKER_ID = 3
+CALIBRATOR_ID = 4

@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 from bbox import Box2D, ObjectSize, Coordinates
+from params import FRAME_LOADER_ID, TRACKER_ID, DETECTOR_ID
 from pipeline import ThreadedPipeBlock
 
 
@@ -9,7 +10,7 @@ class Detector(ThreadedPipeBlock):
 
     def __init__(self, model, detection_area, output=None):
 
-        super().__init__(output)
+        super().__init__(pipe_id=DETECTOR_ID, output=output)
 
         self.detection_area = detection_area
 
@@ -31,7 +32,7 @@ class Detector(ThreadedPipeBlock):
         self.sess = tf.Session(graph=self.detection_graph)
 
     def _step(self, seq):
-        seq, image = self.next()
+        seq, image = self.receive(FRAME_LOADER_ID)
 
         img_expanded = np.expand_dims(image, axis=0)
 
@@ -41,7 +42,7 @@ class Detector(ThreadedPipeBlock):
 
         packet_boxes = self.parse_boxes(boxes, scores)
 
-        self.send_to_all(packet_boxes, pipe=0)
+        self.send(packet_boxes, pipe_id=TRACKER_ID)
 
     def parse_boxes(self, boxes, scores):
 

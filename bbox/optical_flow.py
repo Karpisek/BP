@@ -13,7 +13,7 @@ FEATURE_PARAMS = dict(qualityLevel=0.3,
 
 MAX_OPTICAL_FEATURES = 150
 
-GRID_DENSITY = 10
+GRID_DENSITY = 13
 
 
 class OpticalFlow:
