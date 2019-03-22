@@ -6,6 +6,10 @@ DEFAULT_NUMBER_INPUTS = 1
 DEFAULT_QUEUE_SIZE = 20
 
 
+def is_frequency(seq, frequency):
+    return seq % frequency == 0
+
+
 class PipeBlock:
 
     def __init__(self, pipe_id, output=None, queue_size=DEFAULT_QUEUE_SIZE):
@@ -25,7 +29,7 @@ class PipeBlock:
     def send(self, message, pipe_id):
         self._output[pipe_id].deliver(message, pipe_id=self.id)
 
-    def deliver(self, message, pipe_id):
+    def deliver(self, message, pipe_id: int):
         self._input[pipe_id].put(message)
 
     def receive(self, pipe_id):

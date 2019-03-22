@@ -1,8 +1,8 @@
 import cv2
+import params
 
-from params import VIDEO_PLAYER_ID, TRACKER_ID, DETECTOR_ID, FRAME_LOADER_ID
 from pipeline import ThreadedPipeBlock
-from .tracker import APROXIMATION_FRAME_COUNT, OPTICAL_FLOW_PAUSE
+from pipeline.pipeline import is_frequency
 
 IMAGE_WIDTH_FOR_CNN = 900
 
@@ -15,7 +15,7 @@ class FrameLoader(ThreadedPipeBlock):
         :param path: given path for input
         """
 
-        super().__init__(pipe_id=FRAME_LOADER_ID, output=output)
+        super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._frame_rate = 0
         self._tape = cv2.VideoCapture(path)
         self.set_info(input_info)
@@ -31,22 +31,21 @@ class FrameLoader(ThreadedPipeBlock):
         _, image = self._tape.read()
 
         message = (seq, image)
-        self.send(message, pipe_id=VIDEO_PLAYER_ID)
+        self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
-        if seq % OPTICAL_FLOW_PAUSE == 0:
-            self.send(message, pipe_id=TRACKER_ID)
+        if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+            self.send(message, pipe_id=params.CALIBRATOR_ID)
 
-        if seq % APROXIMATION_FRAME_COUNT == 0:
+        if is_frequency(seq, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
+            self.send(message, pipe_id=params.TRACKER_ID)
+
+        if is_frequency(seq, params.DETECTOR_FREQUENCY):
 
             height, width, _ = image.shape
             scale = height / width
             image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
 
-            self.send((seq, image), pipe_id=DETECTOR_ID)
-
-
-
-            # time.sleep(0.1)
+            self.send((seq, image), pipe_id=params.DETECTOR_ID)
 
     @property
     def frame_rate(self):

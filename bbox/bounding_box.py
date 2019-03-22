@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 from bbox.coordinates import Coordinates
+from params import TRACKER_OPTICAL_FLOW_FREQUENCY
 
 COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (255, 0, 0)
@@ -194,8 +195,8 @@ class Box2D:
         mesurement = np.array([
             [np.float32(0)],
             [np.float32(0)],
-            [np.float32(x_flow/3)],
-            [np.float32(y_flow/3)]
+            [np.float32(x_flow/TRACKER_OPTICAL_FLOW_FREQUENCY)],
+            [np.float32(y_flow/TRACKER_OPTICAL_FLOW_FREQUENCY)]
         ])
 
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX

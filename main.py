@@ -18,14 +18,14 @@ area_of_detection = Area()
 # video playback
 video_player = VideoPlayer(area_of_detection=area_of_detection, info=input_info)
 
+# calibrator
+calibrator = Calibrator()
+
 # foreground detector
-tracker = Tracker(area_of_detection=area_of_detection, info=input_info, output=[video_player])
+tracker = Tracker(area_of_detection=area_of_detection, info=input_info, output=[video_player, calibrator])
 
 # car detector
 detector = Detector(model=PATH_TO_MODEL, detection_area=area_of_detection, output=[tracker])
-
-# calibrator
-calibrator = Calibrator()
 
 # frame loader
 frame_loader = FrameLoader(VIDEO_PATH, [detector, video_player, tracker, calibrator], input_info)
