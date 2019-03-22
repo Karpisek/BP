@@ -40,7 +40,7 @@ class VideoPlayer(PipeBlock):
             mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
 
             cv2.imshow("image", cv2.add(image, mask))
-            key = cv2.waitKey(1)
+            key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
             #  commands
             if key & 0xFF == ord("q"):

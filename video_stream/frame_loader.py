@@ -18,6 +18,9 @@ class FrameLoader(ThreadedPipeBlock):
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._frame_rate = 0
         self._tape = cv2.VideoCapture(path)
+        self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
+                                                               varThreshold=params.FRAME_LOADER_THRESHOLD)
+
         self.set_info(input_info)
 
     def _step(self, seq):
@@ -28,15 +31,23 @@ class FrameLoader(ThreadedPipeBlock):
         """
 
         seq += 1
-        _, image = self._tape.read()
+        status, image = self._tape.read()
 
-        message = (seq, image)
-        self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+        if status is False:
+            return
+
+        # foreground = self._subtractor.apply(image)
+
+        if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
+            message = (seq, image)
+            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
         if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+            message = (seq, image)
             self.send(message, pipe_id=params.CALIBRATOR_ID)
 
         if is_frequency(seq, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
+            message = (seq, image)
             self.send(message, pipe_id=params.TRACKER_ID)
 
         if is_frequency(seq, params.DETECTOR_FREQUENCY):
@@ -45,7 +56,8 @@ class FrameLoader(ThreadedPipeBlock):
             scale = height / width
             image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
 
-            self.send((seq, image), pipe_id=params.DETECTOR_ID)
+            message = (seq, image)
+            self.send(message, pipe_id=params.DETECTOR_ID)
 
     @property
     def frame_rate(self):

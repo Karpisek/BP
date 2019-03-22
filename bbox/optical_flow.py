@@ -3,8 +3,8 @@ import numpy as np
 
 from bbox import Box2D
 
-LK_PARAMS = dict(winSize=(15, 15),
-                 maxLevel=6,
+LK_PARAMS = dict(winSize=(31, 31),
+                 maxLevel=7,
                  criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 FEATURE_PARAMS = dict(qualityLevel=0.3,
@@ -13,18 +13,19 @@ FEATURE_PARAMS = dict(qualityLevel=0.3,
 
 MAX_OPTICAL_FEATURES = 150
 
-GRID_DENSITY = 13
+GRID_DENSITY = 11
 
 
 class OpticalFlow:
     OPTICAL_FLOW_COLOR = (200, 200, 50)
 
-    def __init__(self):
+    def __init__(self, info):
         self._new_positions = []
         self._old_positions = []
         self._previous_image = None
         self._features_to_track = None
 
+        self._info = info
         self._doter = None
 
     @staticmethod
@@ -62,11 +63,14 @@ class OpticalFlow:
         if self._previous_image is not None:
 
             for box in Box2D.boxes:
-                cv2.circle(mask_for_detection, box.center.tuple(), box.area_of_interest(), 255, -1)
+                cv2.circle(mask_for_detection, box.center.tuple(), box.area("outer"), 255, -1)
 
             if self.tracked_point_count:
-                moved_grid, st, err = cv2.calcOpticalFlowPyrLK(self._previous_image, new_frame_gray,
-                                                               self._features_to_track.astype(np.float32), None, **LK_PARAMS)
+                moved_grid, st, err = cv2.calcOpticalFlowPyrLK(self._previous_image,
+                                                               new_frame_gray,
+                                                               self._features_to_track.astype(np.float32),
+                                                               None,
+                                                               **LK_PARAMS)
 
                 self._new_positions = moved_grid[st == 1]
                 self._old_positions = self._features_to_track[st == 1]
@@ -78,16 +82,21 @@ class OpticalFlow:
         self._features_to_track = np.zeros(shape=(0, 1, 2), dtype=np.float32)
 
         if len(Box2D.boxes):
+
+            # for box in Box2D.boxes:
+            mask = Box2D.all_boxes_mask(self._info, area_size="inner")
+
+            print(mask.shape, self._doter.shape)
+            out_masked = cv2.bitwise_and(self._doter, mask)
+
+            nonzero = cv2.findNonZero(out_masked)
+
+            self._features_to_track = nonzero
+            # if nonzero is not None:
+            #     self._features_to_track = np.concatenate((self._features_to_track, nonzero))
+
             for box in Box2D.boxes:
 
-                mask = box.mask(new_frame_gray)
-                out_masked = cv2.bitwise_and(self._doter, mask)
-
-                nonzero = cv2.findNonZero(out_masked)
-                if nonzero is not None:
-                    self._features_to_track = np.concatenate((self._features_to_track, nonzero))
-
-            for box in Box2D.boxes:
                 box.update_flow(self._old_positions, self._new_positions)
 
             self._features_to_track = np.unique(self._features_to_track, axis=0)

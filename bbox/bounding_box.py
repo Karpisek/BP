@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 
+import params
 from bbox.coordinates import Coordinates
-from params import TRACKER_OPTICAL_FLOW_FREQUENCY
 
 COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (255, 0, 0)
@@ -42,10 +42,10 @@ KALMAN_PROCESS_NOISE_COV = np.array([
 ], np.float32) * 0.5
 
 KALMAN_MESUREMENT_NOISE_COV = np.array([
-    [40, 0, 0, 0],
-    [0, 40, 0, 0],
-    [0, 0, .1, 0],
-    [0, 0, 0, .1],
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, 1],
 ], np.float32) * 1
 
 
@@ -56,7 +56,7 @@ class Box2D:
 
     MAX_LIFETIME = 25
     MINIMAL_SCORE_CORRECTION = 0.5
-    MINIMAL_SCORE_NEW = 0.8
+    MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
     def draw(image, anchors, area_of_interest, car_info, flow_diff) -> None:
@@ -71,6 +71,15 @@ class Box2D:
         x, y = center_point
 
         cv2.line(image, center_point, (int(x + dx), int(y + dy)), COLOR_RED, 1)
+
+    @staticmethod
+    def all_boxes_mask(info, area_size="inner"):
+        global_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
+
+        for box in Box2D.boxes:
+            global_mask = cv2.bitwise_or(global_mask, box.mask(info, area_size=area_size))
+
+        return global_mask
 
     def __init__(self, coordinates, size, confident_score, info, tracker):
 
@@ -147,20 +156,20 @@ class Box2D:
     def car_info(self) -> str:
         return str(self._id)
 
-    def area_of_interest(self) -> int:
-        width = self.size.width
-        height = self.size.height
-
-        diagonal = np.sqrt(width * width + height * height)
-        return int(diagonal/2)
-
-    def inner_area(self) -> int:
+    def area(self, area_size) -> int:
         width = self.size.width
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
 
-        return int(diagonal/2) if int(diagonal/2) < 20 else 20
+        if area_size == "inner":
+            return int(diagonal/2) if int(diagonal/2) < 20 else 20
+        if area_size == "outer":
+            return int(diagonal / 2)
+        if area_size == "small-outer":
+            return int(diagonal / 2) - 2
+        else:
+            return 0
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
         return self.left_anchor, self.right_anchor, self.center.tuple(), self.tracker
@@ -195,8 +204,8 @@ class Box2D:
         mesurement = np.array([
             [np.float32(0)],
             [np.float32(0)],
-            [np.float32(x_flow/TRACKER_OPTICAL_FLOW_FREQUENCY)],
-            [np.float32(y_flow/TRACKER_OPTICAL_FLOW_FREQUENCY)]
+            [np.float32(x_flow/params.TRACKER_OPTICAL_FLOW_FREQUENCY)],
+            [np.float32(y_flow/params.TRACKER_OPTICAL_FLOW_FREQUENCY)]
         ])
 
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
@@ -215,7 +224,7 @@ class Box2D:
 
         return self.center.distance(new_coordinates) < max_pixels
 
-    def extract_flow(self, old_positions, new_positions) -> (int, int):
+    def extract_flow(self, old_positions, new_positions) -> (float, float):
 
         global_dx = 0
         global_dy = 0
@@ -241,13 +250,13 @@ class Box2D:
         else:
             return 0, 0
 
-    def mask(self, image) -> np.ndarray:
-        mask = np.zeros_like(image)
+    def mask(self, info, area_size="inner") -> np.ndarray:
+        mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
 
-        cv2.circle(mask, self.center.tuple(), self.inner_area(), 255, -1)
+        cv2.circle(mask, self.center.tuple(), self.area(area_size), 255, -1)
 
         return mask
 
     def serialize(self):
-        return self.anchors(), self.area_of_interest(), self.car_info, self.velocity
+        return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
 

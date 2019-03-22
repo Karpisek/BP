@@ -26,13 +26,9 @@ class Tracker(ThreadedPipeBlock):
         self._info = info
         self._points_to_track = None
 
-        self._optical_flow = OpticalFlow()
+        self._optical_flow = OpticalFlow(info)
 
     def _step(self, seq):
-        if is_frequency(seq, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
-            _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-            self._optical_flow.update(new_frame)
-
         if is_frequency(seq, params.DETECTOR_FREQUENCY):
             self._update_from_detector(seq)
         else:
@@ -53,13 +49,18 @@ class Tracker(ThreadedPipeBlock):
                 Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
 
         else:
+            self.receive(pipe_id=params.FRAME_LOADER_ID)
+
             Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
 
             message = sequence_number, [box.serialize() for box in Box2D.boxes], ([], [])
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-                message = sequence_number, [box.serialize() for box in Box2D.boxes]
+                message = sequence_number, \
+                          Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
+                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer")
+
                 self.send(message, pipe_id=params.CALIBRATOR_ID)
 
     def _update_from_predictor(self, sequence_number) -> None:
@@ -72,15 +73,23 @@ class Tracker(ThreadedPipeBlock):
             for box in Box2D.boxes:
                 box.predict()
 
+            if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
+                _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+                self._optical_flow.update(new_frame)
+
             message = sequence_number, [box.serialize() for box in Box2D.boxes], self._optical_flow.serialize()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-                message = sequence_number, [box.serialize() for box in Box2D.boxes]
+                message = sequence_number, \
+                          Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
+                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer")
+
                 self.send(message, pipe_id=params.CALIBRATOR_ID)
         else:
+            self.receive(pipe_id=params.FRAME_LOADER_ID)
 
-            message = sequence_number, [], [], []
+            message = sequence_number, [], ([], [])
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):

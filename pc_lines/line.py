@@ -9,6 +9,10 @@ class NoIntersectionError(Exception):
     pass
 
 
+class NotOnLineError(Exception):
+    pass
+
+
 class Line:
     def __init__(self, point1, point2):
         
@@ -96,5 +100,18 @@ class Line:
         x, y = point
 
         return self.a * x + self.b * y + self.c == 0
+
+    def find_coordinate(self, x=None, y=None) -> (float, float):
+        if y is None and x is None:
+            return None
+        
+        try:
+            if x is not None:
+                return x, ((-self.a) * x - self.c) / self.b
+            else:
+                return ((-self.b) * y - self.c) / self.a, y
+            
+        except ZeroDivisionError:
+            raise NotOnLineError
 
 
