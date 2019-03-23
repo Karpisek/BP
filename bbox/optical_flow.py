@@ -85,8 +85,6 @@ class OpticalFlow:
 
             # for box in Box2D.boxes:
             mask = Box2D.all_boxes_mask(self._info, area_size="inner")
-
-            print(mask.shape, self._doter.shape)
             out_masked = cv2.bitwise_and(self._doter, mask)
 
             nonzero = cv2.findNonZero(out_masked)

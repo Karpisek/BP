@@ -9,6 +9,8 @@ import time
 from queue import Full
 
 from pc_lines.line import Line, SamePointError
+from pc_lines.pc_line import PcLines
+from pc_lines.vanishing_point import VanishingPoint
 from pipeline import ThreadedPipeBlock
 
 
@@ -20,28 +22,25 @@ class SyncError(Exception):
 
 
 class Calibrator(ThreadedPipeBlock):
-    def __init__(self, output=None):
+    def __init__(self, output=None, info=None):
         super().__init__(pipe_id=params.CALIBRATOR_ID, output=output)
 
         self._vanishing_points = [VanishingPoint() for _ in range(3)]
+        self._pc_lines = PcLines(info.width)
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
         seq_tracker, boxes_mask, boxes_mask_no_border = self.receive(pipe_id=params.TRACKER_ID)
 
-        if seq_loader != seq_tracker:
-            raise SyncError
-
-        if not self._vanishing_points[0].found():
-            self.detect_first_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
-        elif not self._vanishing_points[1].found():
-            self.detect_second_vanishing_point()
-
+        # if seq_loader != seq_tracker:
+        #     raise SyncError
+        #
+        # if not self._vanishing_points[0].found():
+        #     self.detect_first_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+        # elif not self._vanishing_points[1].found():
+        #     self.detect_second_vanishing_point()
+        #
         # print(seq_tracker, seq_loader)
-
-    def find_vanishing_point(self):
-        time.sleep(2)
-        self._vanishing_points.append(VanishingPoint())
 
     def detect_first_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border):
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
@@ -64,39 +63,16 @@ class Calibrator(ThreadedPipeBlock):
                     # detected_line = Line(point1, point2)
 
                     cv2.line(helper_image, point1, point2, colors[random.randint(0, 99)], 1, 1)
-
+                    self._pc_lines.pc_line_from_points(point1, point2)
                 except SamePointError:
                     continue
 
-        cv2.imwrite("test.jpg", helper_image)
+            vp = self._pc_lines.find_most_line_cross()
+            print(vp)
+            cv2.circle(new_frame, vp.point, 2, (0,255,0),2)
+            cv2.imwrite("test.jpg", new_frame)
 
         print("tady")
 
     def detect_second_vanishing_point(self):
         pass
-
-
-class VanishingPointError(Exception):
-    pass
-
-
-class VanishingPoint:
-    def __init__(self, point=None, angle=None):
-
-        if point is not None and angle is not None:
-            raise VanishingPointError
-
-        # in case vanishing point is defined
-        if point is not None:
-            self.point = point
-            self.infinity = False
-
-        # in case vanishing point is near infinity
-        if angle is not None:
-            self.angle = angle
-            self.infinity = True
-
-    def found(self):
-        return False
-
-

@@ -8,7 +8,7 @@ IMAGE_WIDTH_FOR_CNN = 900
 
 
 class FrameLoader(ThreadedPipeBlock):
-    def __init__(self, path, output, input_info):
+    def __init__(self, output, input_info):
         """
         Loads frames from given path and saves them in Queue
         async using multiprocessing
@@ -16,12 +16,9 @@ class FrameLoader(ThreadedPipeBlock):
         """
 
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
-        self._frame_rate = 0
-        self._tape = cv2.VideoCapture(path)
+        self._info = input_info
         self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
-                                                               varThreshold=params.FRAME_LOADER_THRESHOLD)
-
-        self.set_info(input_info)
+                                                              varThreshold=params.FRAME_LOADER_THRESHOLD)
 
     def _step(self, seq):
         """
@@ -31,7 +28,7 @@ class FrameLoader(ThreadedPipeBlock):
         """
 
         seq += 1
-        status, image = self._tape.read()
+        status, image = self._info.input.read()
 
         if status is False:
             return
@@ -65,10 +62,3 @@ class FrameLoader(ThreadedPipeBlock):
         :return: fps of current video sequence
         """
         return self._frame_rate
-
-    def set_info(self, input_info):
-        fps = self._tape.get(cv2.CAP_PROP_FPS)
-        height = self._tape.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        width = self._tape.get(cv2.CAP_PROP_FRAME_WIDTH)
-
-        input_info.set_info(fps=fps, height=height, width=width)

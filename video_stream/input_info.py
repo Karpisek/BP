@@ -1,8 +1,13 @@
+import cv2
+
+
 class Info:
-    def __init__(self):
-        self._fps = None
-        self._height = None
-        self._width = None
+    def __init__(self, path):
+
+        self.input = cv2.VideoCapture(path)
+        self._fps = self.input.get(cv2.CAP_PROP_FPS)
+        self._height = self.input.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self._width = self.input.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.track_boxes = True
 
     def set_info(self, fps=None, height=None, width=None, track_boxes=True):

@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot
 
-from video_stream.calibrator import VanishingPoint
+from pc_lines.vanishing_point import VanishingPoint
 from .line import Line, NoIntersectionError, SamePointError, NotOnLineError
 import params
 
@@ -12,13 +12,13 @@ class PcLines:
         self.t_space = []
         self.s_space = []
 
-    def find_most_line_cross(self, image):
+    def find_most_line_cross(self):
         s_line, s_ratio = self.ransac(self.s_space)
         t_line, t_ratio = self.ransac(self.t_space)
 
         try:
             point2 = s_line.find_coordinate(x=0)
-            point3 = s_line.parse_to_line(x=self.delta)
+            point3 = s_line.find_coordinate(x=self.delta)
         except NotOnLineError:
             point2 = (s_line.b, 1000)
             point3 = (s_line.b, -1000)
@@ -31,8 +31,8 @@ class PcLines:
         # plt.plot([point2[0], point3[0]], [point2[1], point3[1]])
 
         try:
-            point2 = t_line.parse_to_line(x=-self.delta)
-            point3 = t_line.parse_to_line(x=0)
+            point2 = t_line.find_coordinate(x=-self.delta)
+            point3 = t_line.find_coordinate(x=0)
         except NotOnLineError:
             point2 = (t_line.b, 1000)
             point3 = (t_line.b, -1000)
@@ -43,8 +43,8 @@ class PcLines:
 
         if s_ratio > t_ratio:
             try:
-                x = s_line.parse_to_line(x=0)[1]
-                y = s_line.parse_to_line(x=self.delta)[1]
+                x = s_line.find_coordinate(x=0)[1]
+                y = s_line.find_coordinate(x=self.delta)[1]
 
                 vp = VanishingPoint(point=(int(np.round(x)), int(np.round(y))))
 
@@ -63,8 +63,8 @@ class PcLines:
 
         else:
             try:
-                x = t_line.parse_to_line(x=0)[1]
-                y = -t_line.parse_to_line(x=-self.delta)[1]
+                x = t_line.find_coordinate(x=0)[1]
+                y = -t_line.find_coordinate(x=-self.delta)[1]
 
                 vp = VanishingPoint(point=(int(np.round(x)), int(np.round(y))))
             except NotOnLineError:
