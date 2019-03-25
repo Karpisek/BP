@@ -4,9 +4,7 @@ import cv2
 import numpy as np
 
 import params
-import time
-
-from queue import Full
+from bbox import Box2D
 
 from pc_lines.line import Line, SamePointError
 from pc_lines.pc_line import PcLines
@@ -25,54 +23,104 @@ class Calibrator(ThreadedPipeBlock):
     def __init__(self, output=None, info=None):
         super().__init__(pipe_id=params.CALIBRATOR_ID, output=output)
 
-        self._vanishing_points = [VanishingPoint() for _ in range(3)]
+        self._vanishing_points = []
         self._pc_lines = PcLines(info.width)
+
+    def draw_vanishing_points(self, image, info) -> None:
+
+        p1 = 0, int(info.height/2)
+        p2 = 1 * int(info.width/4), int(info.height/2)
+        p3 = 2 * int(info.width/4), int(info.height/2)
+        p4 = 3 * int(info.width/4), int(info.height/2)
+        p5 = 4 * int(info.width/4), int(info.height/2)
+
+        p6 = 0, int(info.height)
+        p7 = 1 * int(info.width / 4), int(3 * info.height / 4)
+        p8 = 2 * int(info.width / 4), int(3 * info.height / 4)
+        p9 = 3 * int(info.width / 4), int(3 * info.height / 4)
+        p10 = 4 * int(info.width / 4), int(3 * info.height / 4)
+
+        for i in range(len(self._vanishing_points)):
+            cv2.circle(image, self._vanishing_points[i].point, 2, params.COLOR_RED, 1)
+            # cv2.line(image, p1, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            # cv2.line(image, p2, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            # cv2.line(image, p3, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            # cv2.line(image, p4, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            # cv2.line(image, p5, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+
+            cv2.line(image, p6, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            cv2.line(image, p7, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            cv2.line(image, p8, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            cv2.line(image, p9, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+            cv2.line(image, p10, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
+        return image
+
+    @property
+    def calibrated(self):
+        return len(self._vanishing_points) > 0
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        seq_tracker, boxes_mask, boxes_mask_no_border = self.receive(pipe_id=params.TRACKER_ID)
+        seq_tracker, boxes_mask, boxes_mask_no_border, optical_flow_serialized = self.receive(pipe_id=params.TRACKER_ID)
 
-        # if seq_loader != seq_tracker:
-        #     raise SyncError
-        #
-        # if not self._vanishing_points[0].found():
-        #     self.detect_first_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
-        # elif not self._vanishing_points[1].found():
-        #     self.detect_second_vanishing_point()
-        #
-        # print(seq_tracker, seq_loader)
+        if seq_loader != seq_tracker:
+            raise SyncError
 
-    def detect_first_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border):
+        if len(self._vanishing_points) < 1:
+            self.detect_first_vanishing_point()
+
+        # elif len(self._vanishing_points) < 2:
+        #     self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+        else:
+            exit()
+
+    def detect_first_vanishing_point(self) -> None:
+        if len(Box2D.lifelines()) > params.CALIBRATOR_TRACK_MINIMUM:
+            for lifeline in Box2D.lifelines():
+                old_position, new_position = lifeline
+                self._pc_lines.pc_line_from_points(tuple(old_position), tuple(new_position))
+            self._vanishing_points.append(self._pc_lines.find_most_line_cross())
+            self._pc_lines.clear()
+
+    def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border) -> None:
+        mask = np.zeros_like(new_frame)
+
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
-
         blured = cv2.blur(selected_areas, (5, 5))
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
         no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
+        lines = cv2.HoughLinesP(no_border_canny, 1, np.pi / 350, 20, minLineLength=30, maxLineGap=3)
 
-        lines = cv2.HoughLinesP(no_border_canny, 1, np.pi / 350, 20, minLineLength=30, maxLineGap=5)
-
-        helper_image = cv2.cvtColor(canny, cv2.COLOR_GRAY2RGB)
-
+        print("second")
         if lines is not None:
+
+            vp_1 = self._vanishing_points[0]
+
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
                 point2 = x2, y2
 
                 try:
-                    # detected_line = Line(point1, point2)
+                    track = Line(point1, point2)
+                    a_vp = Line(point1, vp_1.point)
+                    b_vp = Line(point2, vp_1.point)
 
-                    cv2.line(helper_image, point1, point2, colors[random.randint(0, 99)], 1, 1)
-                    self._pc_lines.pc_line_from_points(point1, point2)
+                    # select point which is further from first vanishing point
+                    if a_vp.magnitude > b_vp.magnitude:
+                        to_vp = a_vp
+                    else:
+                        to_vp = b_vp
+
+                    if track.angle(to_vp) > params.CALIBRATOR_ANGLE_MIN:
+                        self._pc_lines.pc_line_from_points(point1, point2)
+                        cv2.line(mask, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
 
-            vp = self._pc_lines.find_most_line_cross()
-            print(vp)
-            cv2.circle(new_frame, vp.point, 2, (0,255,0),2)
-            cv2.imwrite("test.jpg", new_frame)
+        if self._pc_lines.count > params.CALIBRATOR_TRACK_MINIMUM:
+            self._vanishing_points.append(self._pc_lines.find_most_line_cross())
 
-        print("tady")
-
-    def detect_second_vanishing_point(self):
-        pass
+        cv2.imwrite("mask.jpg", mask)
+        # cv2.imwrite("boxes_mask_no_border.jpg", boxes_mask_no_border)
+        cv2.imwrite("test.jpg", no_border_canny)

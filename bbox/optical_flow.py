@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+import params
 from bbox import Box2D
 
 LK_PARAMS = dict(winSize=(31, 31),
@@ -13,8 +14,6 @@ FEATURE_PARAMS = dict(qualityLevel=0.3,
 
 MAX_OPTICAL_FEATURES = 150
 
-GRID_DENSITY = 11
-
 
 class OpticalFlow:
     OPTICAL_FLOW_COLOR = (200, 200, 50)
@@ -26,7 +25,11 @@ class OpticalFlow:
         self._features_to_track = None
 
         self._info = info
-        self._doter = None
+        self._doter = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
+
+        for x in range(int(info.width / params.OPTICAL_FLOW_GRID_DENSITY)):
+            for y in range(int(info.height / params.OPTICAL_FLOW_GRID_DENSITY)):
+                self._doter[y * params.OPTICAL_FLOW_GRID_DENSITY][x * params.OPTICAL_FLOW_GRID_DENSITY] = 255
 
     @staticmethod
     def draw(image, serialized_optical_flow) -> np.ndarray:
@@ -43,19 +46,7 @@ class OpticalFlow:
     def tracked_point_count(self):
         return self._features_to_track.shape[0]
 
-    def init(self, image):
-        height, width, _ = image.shape
-
-        self._doter = np.zeros(shape=(height, width), dtype=np.uint8)
-
-        for x in range(int(width / GRID_DENSITY)):
-            for y in range(int(height / GRID_DENSITY)):
-                self._doter[y * GRID_DENSITY][x * GRID_DENSITY] = 255
-
     def update(self, new_frame):
-
-        if self._doter is None:
-            self.init(new_frame)
 
         new_frame_gray = cv2.cvtColor(new_frame, cv2.COLOR_RGB2GRAY)
         mask_for_detection = np.zeros_like(new_frame_gray)
@@ -82,22 +73,21 @@ class OpticalFlow:
         self._features_to_track = np.zeros(shape=(0, 1, 2), dtype=np.float32)
 
         if len(Box2D.boxes):
-
-            # for box in Box2D.boxes:
             mask = Box2D.all_boxes_mask(self._info, area_size="inner")
             out_masked = cv2.bitwise_and(self._doter, mask)
 
             nonzero = cv2.findNonZero(out_masked)
 
             self._features_to_track = nonzero
-            # if nonzero is not None:
-            #     self._features_to_track = np.concatenate((self._features_to_track, nonzero))
-
             for box in Box2D.boxes:
 
                 box.update_flow(self._old_positions, self._new_positions)
 
-            self._features_to_track = np.unique(self._features_to_track, axis=0)
+            try:
+                self._features_to_track = np.unique(self._features_to_track, axis=0)
+            except np.AxisError:
+                print(self._features_to_track.shape)
+                raise
 
     def serialize(self) -> ([], []):
         return self._old_positions, self._new_positions

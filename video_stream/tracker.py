@@ -16,7 +16,7 @@ def transpose_matrix(matrix):
 
 class Tracker(ThreadedPipeBlock):
 
-    def __init__(self, area_of_detection, info, output=None):
+    def __init__(self, area_of_detection, info, calibrator, output=None):
         super().__init__(pipe_id=params.TRACKER_ID, output=output)
 
         self.new_positions = []
@@ -25,6 +25,8 @@ class Tracker(ThreadedPipeBlock):
         self._area_of_detection = area_of_detection
         self._info = info
         self._points_to_track = None
+
+        self._calibrator = calibrator
 
         self._optical_flow = OpticalFlow(info)
 
@@ -53,15 +55,16 @@ class Tracker(ThreadedPipeBlock):
 
             Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
 
-            message = sequence_number, [box.serialize() for box in Box2D.boxes], ([], [])
+            message = sequence_number, [box.serialize() for box in Box2D.boxes], Box2D.lifelines()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
                 message = sequence_number, \
                           Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
-                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer")
+                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer"), \
+                          self._optical_flow.serialize()
 
-                self.send(message, pipe_id=params.CALIBRATOR_ID)
+                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
     def _update_from_predictor(self, sequence_number) -> None:
 
@@ -77,24 +80,25 @@ class Tracker(ThreadedPipeBlock):
                 _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
                 self._optical_flow.update(new_frame)
 
-            message = sequence_number, [box.serialize() for box in Box2D.boxes], self._optical_flow.serialize()
+            message = sequence_number, [box.serialize() for box in Box2D.boxes], Box2D.lifelines()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
                 message = sequence_number, \
                           Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
-                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer")
+                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer"), \
+                          self._optical_flow.serialize()
 
-                self.send(message, pipe_id=params.CALIBRATOR_ID)
+                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
         else:
             self.receive(pipe_id=params.FRAME_LOADER_ID)
 
-            message = sequence_number, [], ([], [])
+            message = sequence_number, [], []
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
                 message = sequence_number, []
-                self.send(message, pipe_id=params.CALIBRATOR_ID)
+                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
     def _hungarian_method(self, detected_boxes) -> None:
 

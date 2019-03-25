@@ -1,4 +1,6 @@
 import cv2
+import numpy as np
+
 import params
 
 from pipeline import ThreadedPipeBlock
@@ -36,15 +38,15 @@ class FrameLoader(ThreadedPipeBlock):
         # foreground = self._subtractor.apply(image)
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
-            message = (seq, image)
+            message = (seq, np.copy(image))
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
         if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
-            message = (seq, image)
-            self.send(message, pipe_id=params.CALIBRATOR_ID)
+            message = (seq, np.copy(image))
+            self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
         if is_frequency(seq, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
-            message = (seq, image)
+            message = (seq, np.copy(image))
             self.send(message, pipe_id=params.TRACKER_ID)
 
         if is_frequency(seq, params.DETECTOR_FREQUENCY):
@@ -53,12 +55,5 @@ class FrameLoader(ThreadedPipeBlock):
             scale = height / width
             image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
 
-            message = (seq, image)
+            message = (seq, np.copy(image))
             self.send(message, pipe_id=params.DETECTOR_ID)
-
-    @property
-    def frame_rate(self):
-        """
-        :return: fps of current video sequence
-        """
-        return self._frame_rate

@@ -1,4 +1,7 @@
+import cv2
 import numpy as np
+
+import params
 
 
 class SamePointError(Exception):
@@ -15,7 +18,7 @@ class NotOnLineError(Exception):
 
 class Line:
     def __init__(self, point1, point2):
-        
+
         if point1 == point2:
             raise SamePointError
         
@@ -52,23 +55,27 @@ class Line:
     def magnitude(self) -> float:
         return np.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
 
-    def angle(self, line2) -> int:
+    def angle(self, line2) -> float:
         if np.dot(self.direction, line2.direction) == 0:
             angle = 90.
 
         else:
             cos_alpha = np.dot(self.direction, line2.direction) / (self.magnitude * line2.magnitude)
+
+            if cos_alpha > 1:
+                cos_alpha = 1
+
+            elif cos_alpha < -1:
+                cos_alpha = -1
+
             angle = np.degrees(np.arccos(cos_alpha))
 
-        return int(angle)
+        return angle
 
     def parallel(self, line2) -> bool:
         return self.angle(line2) == 0 or self.angle(line2) == 180
 
     def intersection(self, line2) -> (float, float):
-        if self.parallel(line2):
-            raise NoIntersectionError
-
         a = np.array([
             [self.a, self.b],
             [line2.a, line2.b]
@@ -79,7 +86,10 @@ class Line:
             [-line2.c]
         ])
 
-        solved = np.linalg.solve(a, b)
+        try:
+            solved = np.linalg.solve(a, b)
+        except np.linalg.LinAlgError:
+            raise NoIntersectionError
 
         return solved[0][0], solved[1][0]
 
@@ -104,14 +114,12 @@ class Line:
     def find_coordinate(self, x=None, y=None) -> (float, float):
         if y is None and x is None:
             return None
-        
-        try:
-            if x is not None:
-                return x, ((-self.a) * x - self.c) / self.b
-            else:
-                return ((-self.b) * y - self.c) / self.a, y
-            
-        except ZeroDivisionError:
-            raise NotOnLineError
 
-
+        if x is not None:
+            if self.b == 0:
+                raise NotOnLineError
+            return x, ((-self.a) * x - self.c) / self.b
+        else:
+            if self.a == 0:
+                raise NotOnLineError
+            return ((-self.b) * y - self.c) / self.a, y

@@ -53,24 +53,27 @@ class Box2D:
 
     id_counter = 0
     boxes = []
+    _lifelines = []
 
     MAX_LIFETIME = 25
     MINIMAL_SCORE_CORRECTION = 0.5
     MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
-    def draw(image, anchors, area_of_interest, car_info, flow_diff) -> None:
+    def draw(image, boxes, lifelines=None) -> None:
 
-        top_left, bot_right, center_point, tracker = anchors
+        for box in boxes:
+            anchors, area_of_interest, car_info, flow_diff = box
 
-        cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
+            top_left, bot_right, center_point, tracker = anchors
 
-        cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
+            cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
+            cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
 
-        dx, dy = flow_diff
-        x, y = center_point
-
-        cv2.line(image, center_point, (int(x + dx), int(y + dy)), COLOR_RED, 1)
+        if lifelines is not None:
+            for line in lifelines:
+                p1, p2 = line
+                cv2.line(image, p1, p2, COLOR_RED, 1)
 
     @staticmethod
     def all_boxes_mask(info, area_size="inner"):
@@ -80,6 +83,10 @@ class Box2D:
             global_mask = cv2.bitwise_or(global_mask, box.mask(info, area_size=area_size))
 
         return global_mask
+
+    @staticmethod
+    def lifelines():
+        return Box2D._lifelines
 
     def __init__(self, coordinates, size, confident_score, info, tracker):
 
@@ -113,14 +120,20 @@ class Box2D:
 
         self._id = Box2D.id_counter
 
+        self._history = coordinates
+
         Box2D.id_counter += 1
+
+    @property
+    def history(self):
+        return self._history
 
     @property
     def id(self) -> int:
         return self._id
 
     @property
-    def center(self) -> (int, int):
+    def center(self):
         return Coordinates(int(self._kalman.statePost[0][0]), int(self._kalman.statePost[1][0]))
 
     @property
@@ -167,7 +180,7 @@ class Box2D:
         if area_size == "outer":
             return int(diagonal / 2)
         if area_size == "small-outer":
-            return int(diagonal / 2) - 2
+            return int((diagonal-4) / 2)
         else:
             return 0
 
@@ -179,6 +192,8 @@ class Box2D:
         self.lifetime -= 1
 
     def update_position(self, size, score, new_coordinates) -> None:
+
+        # self._history = new_coordinates
 
         size.convert_to_fixed(self._info)
         new_coordinates.convert_to_fixed(info=self._info)
@@ -259,4 +274,7 @@ class Box2D:
 
     def serialize(self):
         return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
+
+    def __del__(self):
+        Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
 

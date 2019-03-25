@@ -25,7 +25,7 @@ class LinearFunctionTests(unittest.TestCase):
         l1 = Line((1, 2), (3, 5))
         l2 = Line((3, 4), (2, 5))
 
-        self.assertEqual(l1.angle(l2), 78)
+        self.assertAlmostEqual(l1.angle(l2), 78.7, 1)
 
     def test_point(self):
         l1 = Line((1, 1), (2, 2))
@@ -56,7 +56,7 @@ class LinearFunctionTests(unittest.TestCase):
         l2 = Line((0, 0), (1, 0))
         l3 = Line((0, 0), (1, 1))
         self.assertEqual(l1.angle(l2), 90)
-        self.assertEqual(l1.angle(l3), 45)
+        self.assertAlmostEqual(l1.angle(l3), 45, 4)
 
         l2.general_equation()
 

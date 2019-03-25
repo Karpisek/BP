@@ -27,7 +27,7 @@ class Coordinates:
         self.y = y
 
     def tuple(self) -> (int, int):
-        return self.x, self.y
+        return int(self.x), int(self.y)
 
     @staticmethod
     def fixed_to_relative(coordinate, dimension):

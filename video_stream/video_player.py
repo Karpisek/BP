@@ -5,6 +5,7 @@ import params
 from bbox import Box2D
 from bbox.optical_flow import OpticalFlow
 from pipeline import PipeBlock
+from pipeline.pipeline import is_frequency
 
 
 class VideoPlayer(PipeBlock):
@@ -14,6 +15,8 @@ class VideoPlayer(PipeBlock):
         self._detector = None
         self._loader = None
         self._tracker = None
+        self.calibrator = None
+
         self._info = info
 
         self._area_of_detection = area_of_detection
@@ -31,15 +34,22 @@ class VideoPlayer(PipeBlock):
         self._area_of_detection.select(cv2.selectROI("image", image), self._info)
 
         while True:
-            tracker_seq, boxes, serialized_optical_flow = self.receive(pipe_id=params.TRACKER_ID)
+            tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-            [Box2D.draw(image, *serialized_box) for serialized_box in boxes]
+            Box2D.draw(image, boxes, lifelines)
+            self.calibrator.draw_vanishing_points(image, self._info)
 
             self._area_of_detection.draw(image)
 
-            mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
+            image_calibrator = None
+            if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+                image_calibrator = self.receive(pipe_id=params.CALIBRATOR_ID, block=False)
 
-            cv2.imshow("image", cv2.add(image, mask))
+            if image_calibrator is not None:
+                cv2.imshow("image", image_calibrator)
+            else:
+                cv2.imshow("image", image)
+
             key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
             #  commands

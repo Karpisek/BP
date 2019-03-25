@@ -1,3 +1,4 @@
+import queue
 import time
 from queue import Queue
 from threading import Thread
@@ -26,14 +27,20 @@ class PipeBlock:
     def start(self):
         raise NotImplementedError
 
-    def send(self, message, pipe_id):
-        self._output[pipe_id].deliver(message, pipe_id=self.id)
+    def send(self, message, pipe_id, block=True):
+        self._output[pipe_id].deliver(message, pipe_id=self.id, block=block)
 
-    def deliver(self, message, pipe_id: int):
-        self._input[pipe_id].put(message)
+    def deliver(self, message, pipe_id: int, block):
+        try:
+            self._input[pipe_id].put(message, block=block)
+        except queue.Full:
+            return
 
-    def receive(self, pipe_id):
-        return self._input[pipe_id].get()
+    def receive(self, pipe_id, block=True):
+        try:
+            return self._input[pipe_id].get(block)
+        except queue.Empty:
+            return None
 
     def connect(self, sender, queue_size):
         self._input[sender.id] = Queue(queue_size)

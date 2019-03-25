@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from matplotlib import pyplot
 
@@ -12,7 +13,15 @@ class PcLines:
         self.t_space = []
         self.s_space = []
 
-    def find_most_line_cross(self):
+    @property
+    def count(self) -> float:
+        return (len(self.t_space) + len(self.s_space)) / 2
+
+    def clear(self) -> None:
+        self.t_space = []
+        self.s_space = []
+
+    def find_most_line_cross(self) -> object:
         s_line, s_ratio = self.ransac(self.s_space)
         t_line, t_ratio = self.ransac(self.t_space)
 
@@ -23,12 +32,10 @@ class PcLines:
             point2 = (s_line.b, 1000)
             point3 = (s_line.b, -1000)
 
-        # plt.xlim((-self._delta, self._delta))
-        # plt.ylim((-900, 900))
+        # pyplot.xlim((-self.delta, self.delta))
+        # pyplot.ylim((-900, 900))
 
-        self.plot()
-        print(point2, point3)
-        # plt.plot([point2[0], point3[0]], [point2[1], point3[1]])
+        # pyplot.plot([point2[0], point3[0]], [point2[1], point3[1]])\
 
         try:
             point2 = t_line.find_coordinate(x=-self.delta)
@@ -37,9 +44,7 @@ class PcLines:
             point2 = (t_line.b, 1000)
             point3 = (t_line.b, -1000)
 
-        # plt.plot([point2[0], point3[0]], [point2[1], point3[1]])
-
-        # plt.show()
+        # pyplot.plot([point2[0], point3[0]], [point2[1], point3[1]])
 
         if s_ratio > t_ratio:
             try:
@@ -59,7 +64,7 @@ class PcLines:
                 vp = VanishingPoint(angle=angle)
                 print("infinity in S")
 
-            self.plot()
+            # self.plot()
 
         else:
             try:
@@ -78,10 +83,12 @@ class PcLines:
 
                 vp = VanishingPoint(angle=-angle)
                 print("infinity in T")
-            self.plot()
+            # self.plot()
 
+        self.debug_spaces_print(s_line, t_line)
+
+        # pyplot.show()
         print(s_ratio, t_ratio)
-        print(vp)
         return vp
 
     def ransac(self, points_with_magnitude):
@@ -124,15 +131,18 @@ class PcLines:
         x1, y1 = point1
         x2, y2 = point2
 
-        magnitude = Line(point1, point2).magnitude
+        try:
+            magnitude = Line(point1, point2).magnitude
+        except SamePointError:
+            return
 
         if magnitude < params.CALIBRATOR_FLOW_THRESHOLD:
             return
 
         l1_s = Line((0, x1), (self.delta, y1))
-        l1_t = Line((-self.delta, -y1), (0, x1))
-
         l2_s = Line((0, x2), (self.delta, y2))
+
+        l1_t = Line((-self.delta, -y1), (0, x1))
         l2_t = Line((-self.delta, -y2), (0, x2))
 
         u = None
@@ -172,3 +182,45 @@ class PcLines:
         ordered_space = [point[0] for point in points_with_magnitude[:params.CALIBRATOR_RANSAC_STEP_POINTS_COUNT]]
 
         return ordered_space
+
+    def debug_spaces_print(self, s_line, t_line):
+        image = np.zeros(shape=(self.delta, self.delta, 3))
+
+        cv2.line(image, (int(self.delta/2), 0), (int(self.delta/2), self.delta), (255, 255, 255), 1)
+        cv2.line(image, (0, int(self.delta/2)), (self.delta, int(self.delta/2)), (255, 255, 255), 1)
+
+        y1 = int(self.delta - s_line.find_coordinate(x=0)[1])
+        y2 = int(self.delta - s_line.find_coordinate(x=self.delta)[1])
+
+        x1 = int(0)
+        x2 = int(self.delta)
+
+        cv2.line(image, (x1, y1), (x2, y2), (0, 0, 255), int(params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta * 2))
+
+        # y2 = int(self.delta - t_line.find_coordinate(x=0)[1])
+        # y1 = int(self.delta - (t_line.find_coordinate(x=-self.delta)[1]))
+        #
+        # x1 = int(0)
+        # x2 = int(self.delta)
+        #
+        # cv2.line(image, (x1, y1), (x2, y2), (0, 0, 255), int(params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta * 2))
+
+        for point in self.s_space:
+            x, y = point[0]
+            x = self.delta + x
+            y = self.delta - y
+
+            cv2.circle(image, (int(x), int(y)), 1, (255, 0, 0), 2)
+
+        for point in self.t_space:
+            u, v = point[0]
+
+            try:
+                x = u / ((self.delta + 2 * u) / self.delta)
+                y = v / ((self.delta + 2 * u) / self.delta)
+            except ZeroDivisionError:
+                continue
+
+            cv2.circle(image, (int(x), int(y)), 1, (0, 255, 0), 2)
+
+        cv2.imwrite("ransac.jpg", image)
