@@ -15,7 +15,7 @@ class PcLines:
 
     @property
     def count(self) -> float:
-        return (len(self.t_space) + len(self.s_space)) / 2
+        return len(self.t_space) + len(self.s_space)
 
     def clear(self) -> None:
         self.t_space = []
@@ -142,9 +142,9 @@ class PcLines:
 
         return vp_s
 
-    def ransac_from_preset(self, info):
+    def ransac_from_preset(self, info) -> (object, int):
         preset_x_coordinates = [int(x * params.CALIBRATOR_GRID_DENSITY - info.width / 2) for x in range(int((2 * info.width) / params.CALIBRATOR_GRID_DENSITY))]
-        preset_y_coordinates = [int(y * params.CALIBRATOR_GRID_DENSITY - 4 * info.height / 5) for y in range(int(info.height / params.CALIBRATOR_GRID_DENSITY))]
+        preset_y_coordinates = [int(y * params.CALIBRATOR_GRID_DENSITY - 6 * info.height / 7) for y in range(int(info.height / params.CALIBRATOR_GRID_DENSITY))]
 
         best_line_ratio = 0
         best_line = None
@@ -336,7 +336,7 @@ class PcLines:
             else:
                 self.s_space.append(((u, v), magnitude))
 
-    def plot(self):
+    def plot(self) -> None:
         x_val = [x[0][0] for x in self.s_space]
         y_val = [x[0][1] for x in self.s_space]
 
@@ -355,7 +355,7 @@ class PcLines:
 
         return ordered_space
 
-    def debug_spaces_print(self, line):
+    def debug_spaces_print(self, line) -> None:
         image = np.zeros(shape=(2 * self.delta, 2 * self.delta, 3))
 
         cv2.line(image, (int(self.delta), 0), (int(self.delta), 2 * self.delta), (255, 255, 255), 1)

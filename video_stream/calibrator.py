@@ -29,12 +29,6 @@ class Calibrator(ThreadedPipeBlock):
 
     def draw_vanishing_points(self, image, info) -> None:
 
-        p1 = 0, int(info.height/2)
-        p2 = 1 * int(info.width/4), int(info.height/2)
-        p3 = 2 * int(info.width/4), int(info.height/2)
-        p4 = 3 * int(info.width/4), int(info.height/2)
-        p5 = 4 * int(info.width/4), int(info.height/2)
-
         p6 = 0, int(info.height)
         p7 = 1 * int(info.width / 4), int(3 * info.height / 4)
         p8 = 2 * int(info.width / 4), int(3 * info.height / 4)
@@ -43,12 +37,6 @@ class Calibrator(ThreadedPipeBlock):
 
         for i in range(len(self._vanishing_points)):
             cv2.circle(image, self._vanishing_points[i].point, 2, params.COLOR_RED, 1)
-            # cv2.line(image, p1, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
-            # cv2.line(image, p2, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
-            # cv2.line(image, p3, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
-            # cv2.line(image, p4, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
-            # cv2.line(image, p5, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
-
             cv2.line(image, p6, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
             cv2.line(image, p7, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
             cv2.line(image, p8, self._vanishing_points[i].point, params.COLOR_GREEN, 1)
@@ -100,44 +88,26 @@ class Calibrator(ThreadedPipeBlock):
             self._pc_lines.clear()
 
     def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border) -> None:
-        mask = np.zeros_like(new_frame)
-
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
-        blured = cv2.blur(selected_areas, (5, 5))
+        blured = cv2.blur(selected_areas, (3, 3))
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
         no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
         lines = cv2.HoughLinesP(no_border_canny, 1, np.pi / 350, 20, minLineLength=30, maxLineGap=3)
 
-        print("second")
         if lines is not None:
-
-            vp_1 = self._vanishing_points[0]
-
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
                 point2 = x2, y2
 
                 try:
-                    track = Line(point1, point2)
-                    a_vp = Line(point1, vp_1.point)
-                    b_vp = Line(point2, vp_1.point)
-
-                    # select point which is further from first vanishing point
-                    if a_vp.magnitude > b_vp.magnitude:
-                        to_vp = a_vp
-                    else:
-                        to_vp = b_vp
-
-                    if track.angle(to_vp) > params.CALIBRATOR_ANGLE_MIN:
-                        self._pc_lines.pc_line_from_points(point1, point2)
-                        cv2.line(mask, point1, point2, params.COLOR_BLUE, 1)
+                    self._pc_lines.pc_line_from_points(point1, point2)
+                    cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
 
+        print(self._pc_lines.count)
         if self._pc_lines.count > params.CALIBRATOR_TRACK_MINIMUM:
             self._vanishing_points.append(self._pc_lines.find_most_line_cross(self.info))
 
-        cv2.imwrite("mask.jpg", mask)
-        # cv2.imwrite("boxes_mask_no_border.jpg", boxes_mask_no_border)
-        cv2.imwrite("test.jpg", no_border_canny)
+        cv2.imwrite("test.jpg", selected_areas)

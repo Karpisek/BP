@@ -3,7 +3,6 @@ import cv2
 import params
 
 from bbox import Box2D
-from bbox.optical_flow import OpticalFlow
 from pipeline import PipeBlock
 from pipeline.pipeline import is_frequency
 

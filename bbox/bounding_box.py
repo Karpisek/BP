@@ -214,7 +214,7 @@ class Box2D:
         if area_size == "outer":
             return int(diagonal / 2)
         if area_size == "small-outer":
-            return int((diagonal-4) / 2)
+            return int((diagonal - 3) / 2)
         else:
             return 0
 
