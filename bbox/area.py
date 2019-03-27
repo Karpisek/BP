@@ -17,12 +17,10 @@ class Area:
     def defined(self):
         return self.top_left is not None and self.bot_right is not None
 
-    def select(self, area, info):
-        xmin, ymin, area_width, area_height = area
-
+    def select(self, info):
+        self.top_left = Coordinates(0, int(info.height/4))
+        self.bot_right = Coordinates(info.width, info.height)
         self.info = info
-        self.top_left = Coordinates(xmin, ymin)
-        self.bot_right = Coordinates(xmin + area_width, ymin + area_height)
 
     def draw(self, image, color=COLOR_AREA):
 

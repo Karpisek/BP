@@ -50,6 +50,16 @@ KALMAN_MESUREMENT_NOISE_COV = np.array([
 ], np.float32) * 1
 
 
+class Box2DRepository:
+    def __init__(self):
+        self.id_counter = 0
+        self.boxes = []
+        self._lifelines = []
+
+    def new_box(self):
+        raise NotImplementedError
+
+
 class Box2D:
 
     id_counter = 0
@@ -61,14 +71,14 @@ class Box2D:
     MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
-    def draw_lifelines(image, lifelines=None) -> None:
+    def draw_lifelines(image, lifelines=None, color=params.COLOR_RED) -> None:
         if lifelines is not None:
             for line in lifelines:
                 p1, p2 = line
 
                 try:
                     l = Line(p1, p2)
-                    l.draw(image, params.COLOR_RED)
+                    l.draw(image, color)
                 except SamePointError:
                     continue
 

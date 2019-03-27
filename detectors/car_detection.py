@@ -11,9 +11,7 @@ class Detector(ThreadedPipeBlock):
     def __init__(self, model, detection_area, output=None):
 
         super().__init__(pipe_id=params.DETECTOR_ID, output=output)
-
         self.detection_area = detection_area
-
         self.detection_graph = tf.Graph()
 
         with self.detection_graph.as_default():
@@ -33,7 +31,6 @@ class Detector(ThreadedPipeBlock):
 
     def _step(self, seq):
         seq, image = self.receive(params.FRAME_LOADER_ID)
-
         img_expanded = np.expand_dims(image, axis=0)
 
         (boxes, scores, classes, num) = self.sess.run(
@@ -41,7 +38,6 @@ class Detector(ThreadedPipeBlock):
             feed_dict={self.image_tensor: img_expanded})
 
         packet_boxes = self.parse_boxes(boxes, scores)
-
         self.send(packet_boxes, pipe_id=params.TRACKER_ID)
 
     def parse_boxes(self, boxes, scores):

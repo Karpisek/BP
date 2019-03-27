@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
 
-import params
-
-
 class SamePointError(Exception):
     pass
 
@@ -124,13 +121,13 @@ class Line:
                 raise NotOnLineError
             return ((-self.b) * y - self.c) / self.a, y
 
-    def draw(self, image, color):
+    def draw(self, image, color) -> None:
         h, _, _ = image.shape
 
-        p1 = tuple([int(cord) for cord in self.find_coordinate(y=0)])
-        p2 = tuple([int(cord) for cord in self.find_coordinate(y=h)])
+        p1 = [int(cord) for cord in self.find_coordinate(y=0)]
+        p2 = [int(cord) for cord in self.find_coordinate(y=h)]
 
-        cv2.line(image, p1, p2, color, 1)
+        cv2.line(image, tuple(p1), tuple(p2), color, 1)
 
     def __str__(self):
         return f'{self.a}x + {self.b}y + {self.c} = 0'

@@ -27,18 +27,27 @@ class VideoPlayer(PipeBlock):
         clock = time.time()
         frame_counter = 0
 
-        seq, image = self.receive(params.FRAME_LOADER_ID)
+        seq, image, foreground = self.receive(params.FRAME_LOADER_ID)
         frame_counter += 1
 
-        self._area_of_detection.select(cv2.selectROI("image", image), self._info)
+        self._area_of_detection.select(self._info)
 
         while True:
             tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
             Box2D.draw(image, boxes)
-            self.calibrator.draw_vanishing_points(image, self._info)
 
-            self._area_of_detection.draw(image)
+            self._info.draw_vanishing_points(image)
+
+            image_with_corridors = self._info.draw_corridors(image)
+            # self._area_of_detection.draw(image)
+
+            background = cv2.bitwise_not(foreground)
+
+            foreground_cars = cv2.bitwise_and(image, image, mask=foreground)
+            background_corridors = cv2.bitwise_and(image_with_corridors, image_with_corridors, mask=background)
+
+            image = cv2.add(foreground_cars, background_corridors)
 
             image_calibrator = None
             if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
@@ -64,7 +73,7 @@ class VideoPlayer(PipeBlock):
                 frame_counter = 0
                 clock = time.time()
 
-            seq, image = self.receive(params.FRAME_LOADER_ID)
+            seq, image, foreground = self.receive(params.FRAME_LOADER_ID)
             frame_counter += 1
 
         cv2.destroyAllWindows()
