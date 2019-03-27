@@ -123,3 +123,14 @@ class Line:
             if self.a == 0:
                 raise NotOnLineError
             return ((-self.b) * y - self.c) / self.a, y
+
+    def draw(self, image, color):
+        h, _, _ = image.shape
+
+        p1 = tuple([int(cord) for cord in self.find_coordinate(y=0)])
+        p2 = tuple([int(cord) for cord in self.find_coordinate(y=h)])
+
+        cv2.line(image, p1, p2, color, 1)
+
+    def __str__(self):
+        return f'{self.a}x + {self.b}y + {self.c} = 0'

@@ -86,8 +86,7 @@ class OpticalFlow:
             try:
                 self._features_to_track = np.unique(self._features_to_track, axis=0)
             except np.AxisError:
-                print(self._features_to_track.shape)
-                raise
+                self._features_to_track = np.zeros(shape=(0, 1, 2), dtype=np.float32)
 
     def serialize(self) -> ([], []):
         return self._old_positions, self._new_positions

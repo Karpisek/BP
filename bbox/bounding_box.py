@@ -3,6 +3,7 @@ import numpy as np
 
 import params
 from bbox.coordinates import Coordinates
+from pc_lines.line import Line, SamePointError
 
 COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (255, 0, 0)
@@ -60,6 +61,42 @@ class Box2D:
     MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
+    def draw_lifelines(image, lifelines=None) -> None:
+        if lifelines is not None:
+            for line in lifelines:
+                p1, p2 = line
+
+                try:
+                    l = Line(p1, p2)
+                    l.draw(image, params.COLOR_RED)
+                except SamePointError:
+                    continue
+
+    @staticmethod
+    def lifeline_convex_hull(info, lifelines=None) -> np.ndarray:
+        if lifelines is not None:
+
+            contours = []
+            for line in lifelines:
+                try:
+                    l = Line(*line)
+                except SamePointError:
+                    continue
+
+                p1 = tuple([int(cord) for cord in l.find_coordinate(y=0)])
+                p2 = tuple([int(cord) for cord in l.find_coordinate(y=info.height)])
+
+                if p2[0] < 0 or p2[0] > info.width:
+                    continue
+
+                contours.append([p1])
+                contours.append([p2])
+
+            hull = cv2.convexHull(np.array(contours))
+
+            return hull
+
+    @staticmethod
     def draw(image, boxes, lifelines=None) -> None:
 
         for box in boxes:
@@ -70,10 +107,7 @@ class Box2D:
             cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
             cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
 
-        if lifelines is not None:
-            for line in lifelines:
-                p1, p2 = line
-                cv2.line(image, p1, p2, COLOR_RED, 1)
+        Box2D.draw_lifelines(image, lifelines)
 
     @staticmethod
     def all_boxes_mask(info, area_size="inner"):
@@ -103,7 +137,7 @@ class Box2D:
         self._info = info
         self._kalman = cv2.KalmanFilter(4, 4)
 
-        self.lifetime = Box2D.MAX_LIFETIME
+        self.lifetime = 0
 
         self._kalman.transitionMatrix = KALMAN_TRANSITION_MATRIX
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX

@@ -18,7 +18,7 @@ class VanishingPoint:
             raise VanishingPointError
 
         x, y = point
-        self._point = np.clip(x, params.UINT_MIN, params.UINT_MAX), np.clip(y, params.UINT_MIN, params.UINT_MAX)
+        self._point = int(np.clip(x, params.UINT_MIN, params.UINT_MAX)), int(np.clip(y, params.UINT_MIN, params.UINT_MAX))
         self.angle = angle
 
         # in case vanishing point is defined

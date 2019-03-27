@@ -35,7 +35,7 @@ class Area:
 
     def contains(self, coordinates, relative=False):
         if not self.defined:
-            return True
+            return False
 
         if relative:
             coordinates.convert_to_fixed(self.info)

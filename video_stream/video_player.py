@@ -36,7 +36,7 @@ class VideoPlayer(PipeBlock):
         while True:
             tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-            Box2D.draw(image, boxes, lifelines)
+            Box2D.draw(image, boxes)
             self.calibrator.draw_vanishing_points(image, self._info)
 
             self._area_of_detection.draw(image)
