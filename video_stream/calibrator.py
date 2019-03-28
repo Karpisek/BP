@@ -65,7 +65,6 @@ class Calibrator(ThreadedPipeBlock):
                 except SamePointError:
                     continue
 
-        print(self._pc_lines.count)
         if self._pc_lines.count > params.CALIBRATOR_TRACK_MINIMUM:
 
             for lifeline in Box2D.lifelines():
