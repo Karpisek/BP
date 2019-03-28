@@ -71,16 +71,21 @@ class Box2D:
     MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
-    def draw_lifelines(image, lifelines=None, color=params.COLOR_RED) -> None:
+    def draw_lifelines(image, lifelines=None, color=params.COLOR_RED, thickness=1) -> np.ndarray:
         if lifelines is not None:
             for line in lifelines:
+
+                mask = np.zeros_like(image)
+
                 p1, p2 = line
 
                 try:
                     l = Line(p1, p2)
-                    l.draw(image, color)
+                    l.draw(mask, color, thickness)
+                    image = cv2.add(image, mask)
                 except SamePointError:
                     continue
+        return image
 
     @staticmethod
     def lifeline_convex_hull(info, lifelines=None) -> np.ndarray:
@@ -320,5 +325,8 @@ class Box2D:
         return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
 
     def __del__(self):
-        Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
+
+        # only lifelines from bot to top
+        if self.center.y < self.history.y:
+            Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
 

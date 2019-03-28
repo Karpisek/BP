@@ -37,10 +37,10 @@ class FrameLoader(ThreadedPipeBlock):
         if status is False:
             return
 
-        foreground = self._subtractor.apply(image)
+        # foreground = self._subtractor.apply(image)
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
-            message = (seq, np.copy(image), np.copy(foreground))
+            message = (seq, np.copy(image))
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
         if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
@@ -58,4 +58,4 @@ class FrameLoader(ThreadedPipeBlock):
             image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
 
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.DETECTOR_ID)
+            self.send(message, pipe_id=params.DETECTOR_CAR_ID)

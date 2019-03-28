@@ -80,8 +80,6 @@ class Calibrator(ThreadedPipeBlock):
 
     def detect_second_vanishing_point(self) -> None:
 
-        # TODO !!!!
-
         if len(Box2D.lifelines()) > params.CALIBRATOR_TRACK_MINIMUM:
             for lifeline in Box2D.lifelines():
                 old_position, new_position = lifeline
@@ -93,6 +91,9 @@ class Calibrator(ThreadedPipeBlock):
 
     def find_corridors(self):
         mask = np.zeros(shape=(self.info.height, self.info.width, 3), dtype=np.uint8)
-        Box2D.draw_lifelines(mask, Box2D.lifelines(), color=params.COLOR_WHITE)
+        mask = Box2D.draw_lifelines(image=mask,
+                                    lifelines=Box2D.lifelines(),
+                                    color=params.COLOR_LIFELINE,
+                                    thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
 
         self.info.corridors_repository.find_corridors(mask)

@@ -8,9 +8,9 @@ from pipeline import ThreadedPipeBlock
 
 class Detector(ThreadedPipeBlock):
 
-    def __init__(self, model, detection_area, output=None):
+    def __init__(self, model, detection_area, output=None, detector_type_id=params.DETECTOR_CAR_ID):
 
-        super().__init__(pipe_id=params.DETECTOR_ID, output=output)
+        super().__init__(pipe_id=detector_type_id, output=output)
         self.detection_area = detection_area
         self.detection_graph = tf.Graph()
 

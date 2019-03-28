@@ -42,7 +42,7 @@ class TrafficCorridorRepository:
         # extract left-bot-right 1px border around lifeline image and make "1D array"
         left_edge = lifelines_mask[:, :1]
         bottom_edge = lifelines_mask[-1:, :].transpose(1, 0, 2)
-        right_edge = lifelines_mask[:, -1:]
+        right_edge = np.flip(lifelines_mask[:, -1:])
         frame_edge = np.concatenate((left_edge, bottom_edge, right_edge))
 
         # greyscale image and reduce noise by multiple blur and threshold
@@ -51,12 +51,12 @@ class TrafficCorridorRepository:
         edge_grey_blured = cv2.blur(edge_grey, (1, 21))
         _, threshold = cv2.threshold(edge_grey_blured, 50, 255, cv2.THRESH_BINARY)
 
-        edge_grey_blured = cv2.blur(threshold, (1, 31))
-        _, edge_grey_sharp = cv2.threshold(edge_grey_blured, 10, 255, cv2.THRESH_BINARY)
+        # edge_grey_blured = cv2.blur(threshold, (1, 31))
+        # _, edge_grey_sharp = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
 
         height, width = edge_grey_blured.shape
 
-        edge_grey_canny = cv2.Canny(edge_grey_sharp, 50, 150)
+        edge_grey_canny = cv2.Canny(threshold, 50, 150)
 
         coordinates = []
 
@@ -93,6 +93,8 @@ class TrafficCorridorRepository:
             self.create_new_corridor(tuple(points[0]), tuple(points[1]))
 
         cv2.imwrite("mask.jpg", self.get_mask())
+        cv2.imwrite("lifeline.jpg", frame_edge)
+        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
         self._ready = True
 
 

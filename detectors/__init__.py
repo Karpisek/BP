@@ -1,1 +1,1 @@
-from .car_detection import Detector
+from .detector import Detector

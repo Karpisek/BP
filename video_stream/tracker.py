@@ -40,7 +40,7 @@ class Tracker(ThreadedPipeBlock):
 
     def _update_from_detector(self, sequence_number) -> None:
 
-        detected_boxes = self.receive(pipe_id=params.DETECTOR_ID)
+        detected_boxes = self.receive(pipe_id=params.DETECTOR_CAR_ID)
 
         if self._info.track_boxes:
             self._update_from_predictor(sequence_number)
