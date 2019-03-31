@@ -24,22 +24,22 @@ class Calibrator(ThreadedPipeBlock):
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        seq_tracker, boxes_mask, boxes_mask_no_border, optical_flow_serialized = self.receive(pipe_id=params.TRACKER_ID)
+        seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
         if len(self._info.vanishing_points) < 1:
-            self.detect_first_vp()
+            self.detect_first_vp(lifelines)
 
         elif len(self._info.vanishing_points) < 2:
             self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
 
         else:
-            self.find_corridors()
+            self.find_corridors(lifelines)
             exit()
 
-    def detect_first_vp(self):
-        if len(TrackedObject.lifelines()) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
+    def detect_first_vp(self, lifelines):
+        if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
 
-            for lifeline in TrackedObject.lifelines():
+            for lifeline in lifelines:
                 old_position, new_position = lifeline
                 self._pc_lines.pc_line_from_points(tuple(old_position), tuple(new_position))
 
@@ -92,10 +92,10 @@ class Calibrator(ThreadedPipeBlock):
 
         cv2.imwrite("test.jpg", selected_areas)
 
-    def find_corridors(self):
+    def find_corridors(self, lifelines):
         mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
         mask = TrackedObject.draw_lifelines(image=mask,
-                                            lifelines=TrackedObject.lifelines(),
+                                            lifelines=lifelines,
                                             color=params.COLOR_LIFELINE,
                                             thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
 

@@ -1,14 +1,10 @@
 import cv2
 import numpy as np
+from munkres import Munkres
 
 import params
 from bbox.coordinates import Coordinates
 from pc_lines.line import Line, SamePointError, NotOnLineError
-
-COLOR_GREEN = (0, 255, 0)
-COLOR_BLUE = (255, 0, 0)
-COLOR_RED = (0, 0, 255)
-COLOR_WHITE = (0, 0, 0)
 
 BOX_THICKNESS = 2
 CENTER_POINT_RADIUS = 2
@@ -51,31 +47,71 @@ KALMAN_MESUREMENT_NOISE_COV = np.array([
 
 
 class TrackedObjectsRepository:
-    def __init__(self):
+    def __init__(self, info):
         self._id_counter = 0
         self._lifelines = []
         self._tracked_objects = []
+        self._info = info
 
-    def new_box(self, coordinates, size, confident_score, info):
+    @property
+    def list(self):
+        return self._tracked_objects
+
+    @property
+    def lifelines(self):
+        return self._lifelines
+
+    def new_tracked_object(self, coordinates, size, confident_score):
         new_object = TrackedObject(coordinates=coordinates,
                                    size=size,
                                    confident_score=confident_score,
-                                   info=info,
+                                   info=self._info,
                                    object_id=self._id_counter)
 
         self._tracked_objects.append(new_object)
         self._id_counter += 1
 
+    def count(self) -> int:
+        return len(self._tracked_objects)
+
+    def all_boxes_mask(self, area_size="inner"):
+        height = self._info.height
+        width = self._info.width
+        global_mask = np.zeros(shape=(height, width),
+                               dtype=np.uint8)
+
+        for tracked_object in self._tracked_objects:
+            global_mask = cv2.bitwise_or(global_mask, tracked_object.mask(width=width,
+                                                                          height=height,
+                                                                          area_size=area_size))
+
+        return global_mask
+
+    def predict(self) -> None:
+        for tracked_object in self._tracked_objects:
+            tracked_object.predict()
+
+            # if new_lifeline is not None:
+            #     self._lifelines.append(new_lifeline)
+
+    def control_boxes(self) -> None:
+        for tracked_object in self._tracked_objects:
+            if not self._info.update_area.contains(tracked_object.center):
+                starting_coordinates = tracked_object.history
+                end_coordinates = tracked_object.center
+
+                if end_coordinates.y < starting_coordinates.y:
+                    self._lifelines.append((starting_coordinates.tuple(), end_coordinates.tuple()))
+
+                self._tracked_objects.remove(tracked_object)
+
+        # [self._tracked_objects.remove(tracked_object) for tracked_object in self._tracked_objects if not self._info.update_area.contains(tracked_object.center)]
+
+    def serialize(self):
+        return [tracked_object.serialize() for tracked_object in self._tracked_objects]
 
 
 class TrackedObject:
-
-    id_counter = 0
-    boxes = []
-    _lifelines = []
-
-    MINIMAL_SCORE_CORRECTION = 0.5
-    MINIMAL_SCORE_NEW = 0.5
 
     @staticmethod
     def draw_lifelines(image, lifelines=None, color=params.COLOR_RED, thickness=1) -> np.ndarray:
@@ -128,28 +164,15 @@ class TrackedObject:
         for box in boxes:
             anchors, area_of_interest, car_info = box
 
-            top_left, bot_right, center_point, tracker = anchors
+            top_left, bot_right, center_point = anchors
 
-            cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
-            cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
+            cv2.circle(image, center_point, area_of_interest, params.COLOR_BLUE, BOX_THICKNESS)
+            cv2.putText(image, car_info, top_left, 1, 1, params.COLOR_WHITE, 2)
 
         if lifelines is not None:
             return TrackedObject.draw_lifelines(image, lifelines)
         else:
             return image
-
-    @staticmethod
-    def all_boxes_mask(info, area_size="inner"):
-        global_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
-
-        for box in TrackedObject.boxes:
-            global_mask = cv2.bitwise_or(global_mask, box.mask(info, area_size=area_size))
-
-        return global_mask
-
-    @staticmethod
-    def lifelines():
-        return TrackedObject._lifelines
 
     def __init__(self, coordinates, size, confident_score, info, object_id):
 
@@ -218,13 +241,6 @@ class TrackedObject:
         return x_max, y_max
 
     @property
-    def tracker(self) -> (int, int):
-        x_tracker = int(self.center.x)
-        y_tracker = int((self.center.y + self.size.height / 2))
-
-        return x_tracker, y_tracker
-
-    @property
     def car_info(self) -> str:
         return str(self._id)
 
@@ -244,14 +260,14 @@ class TrackedObject:
             return 0
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
-        return self.left_anchor, self.right_anchor, self.center.tuple(), self.tracker
+        return self.left_anchor, self.right_anchor, self.center.tuple()
 
-    def predict(self) -> None:
+    def predict(self) -> ((float, float), (float, float)) or None:
         self._kalman.predict()
         self.lifetime += 1
-        if self.center.y < self.history.y:
-            if self.lifetime == 20:
-                TrackedObject._lifelines.append((self.history.tuple(), self.center.tuple()))
+        # if self.center.y < self.history.y:
+        #     if self.lifetime == 20:
+        #         return self.history.tuple(), self.center.tuple()
 
     def update_position(self, size, score, new_coordinates) -> None:
 
@@ -323,10 +339,13 @@ class TrackedObject:
         else:
             return 0, 0
 
-    def mask(self, info, area_size="inner") -> np.ndarray:
-        mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
-
-        cv2.circle(mask, self.center.tuple(), self.area(area_size), 255, -1)
+    def mask(self, width, height, area_size="inner") -> np.ndarray:
+        mask = np.zeros(shape=(height, width), dtype=np.uint8)
+        cv2.circle(img=mask,
+                   center=self.center.tuple(),
+                   radius=self.area(area_size),
+                   color=params.COLOR_WHITE_MONO,
+                   thickness=params.FILL)
 
         return mask
 

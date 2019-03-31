@@ -40,12 +40,14 @@ class Detector(ThreadedPipeBlock):
         packet_boxes = self.parse_boxes(boxes, scores)
         self.send(packet_boxes, pipe_id=params.TRACKER_ID)
 
-    def parse_boxes(self, boxes, scores):
+    @staticmethod
+    def parse_boxes(boxes, scores):
 
         final_boxes = []
         for _, pair in enumerate(zip(boxes[0], scores[0])):
             box, score = pair
-            if score < TrackedObject.MINIMAL_SCORE_CORRECTION:
+
+            if score < params.TRACKER_MINIMAL_SCORE:
                 break
 
             center, size = Detector.convert_box_to_centroid_object(box)

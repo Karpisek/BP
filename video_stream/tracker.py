@@ -1,13 +1,10 @@
 import params
 
-from bbox import TrackedObject
+from bbox import TrackedObject, TrackedObjectsRepository
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock
 from munkres import Munkres
 from pipeline.pipeline import is_frequency
-
-DISALLOWED = 10000
-TRACKER_INPUTS = 2
 
 
 def transpose_matrix(matrix):
@@ -27,7 +24,10 @@ class Tracker(ThreadedPipeBlock):
 
         self._calibrator = calibrator
 
-        self._optical_flow = OpticalFlow(info)
+        self._tracked_object_repository = TrackedObjectsRepository(info)
+        self._optical_flow = OpticalFlow(info, self._tracked_object_repository)
+
+        self._munkres = Munkres()
 
     def _step(self, seq):
         if is_frequency(seq, params.DETECTOR_FREQUENCY):
@@ -35,111 +35,89 @@ class Tracker(ThreadedPipeBlock):
         else:
             self._update_from_predictor(seq)
 
-        self._control_boxes()
+        self._tracked_object_repository.control_boxes()
+
+    def _send_message(self, target, sequence_number, block=True):
+        message = None
+
+        if target == params.VIDEO_PLAYER_ID:
+            serialized_tracked_objects = self._tracked_object_repository.serialize()
+            tracked_object_lifelines = self._tracked_object_repository.lifelines
+            message = sequence_number, serialized_tracked_objects, tracked_object_lifelines
+
+        elif target == params.CALIBRATOR_ID:
+            outer_masks = self._tracked_object_repository.all_boxes_mask(area_size="outer")
+            outer_masks_no_border = self._tracked_object_repository.all_boxes_mask(area_size="small-outer")
+            lifelines = self._tracked_object_repository.lifelines
+
+            message = sequence_number, outer_masks, outer_masks_no_border, lifelines
+
+        if message is not None:
+            self.send(message, pipe_id=target, block=block)
 
     def _update_from_detector(self, sequence_number) -> None:
 
-        detected_boxes = self.receive(pipe_id=params.DETECTOR_CAR_ID)
+        detected_objects = self.receive(pipe_id=params.DETECTOR_CAR_ID)
 
-        if self._info.track_boxes:
-            self._update_from_predictor(sequence_number)
+        self._update_from_predictor(sequence_number)
 
-            if len(TrackedObject.boxes):
-                self._hungarian_method(detected_boxes)
-            else:
-                for new_box in detected_boxes:
-                    coordinates, size, confident_score = new_box
-
-                    if self._info.start_area.contains(coordinates):
-                        TrackedObject(*new_box, self._info, self)
+        if self._tracked_object_repository.count():
+            self._hungarian_method(detected_objects)
 
         else:
-            self.receive(pipe_id=params.FRAME_LOADER_ID)
-
-            for new_box in detected_boxes:
-                coordinates, size, confident_score = new_box
+            for detected_object in detected_objects:
+                coordinates, size, confident_score = detected_object
 
                 if self._info.start_area.contains(coordinates):
-                    TrackedObject(*new_box, self._info, self)
-
-            message = sequence_number, [box.serialize() for box in TrackedObject.boxes], TrackedObject.lifelines()
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
-
-            if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-                message = sequence_number, \
-                          TrackedObject.all_boxes_mask(info=self._info, area_size="outer"), \
-                          TrackedObject.all_boxes_mask(info=self._info, area_size="small-outer"), \
-                          self._optical_flow.serialize()
-
-                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
+                    self._tracked_object_repository.new_tracked_object(*detected_object)
 
     def _update_from_predictor(self, sequence_number) -> None:
 
-        for box in TrackedObject.boxes:
-            if box.lifetime < 0:
-                TrackedObject.boxes.remove(box)
+        self._tracked_object_repository.predict()
 
-        if self._info.track_boxes:
-            for box in TrackedObject.boxes:
-                box.predict()
+        if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
+            _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+            self._optical_flow.update(new_frame)
 
-            if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
-                _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-                self._optical_flow.update(new_frame)
+        if is_frequency(sequence_number, params.VIDEO_PLAYER_FREQUENCY):
+            self._send_message(target=params.VIDEO_PLAYER_ID,
+                               sequence_number=sequence_number)
 
-            message = sequence_number, [box.serialize() for box in TrackedObject.boxes], TrackedObject.lifelines()
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+        if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
 
-            if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-                message = sequence_number, \
-                          TrackedObject.all_boxes_mask(info=self._info, area_size="outer"), \
-                          TrackedObject.all_boxes_mask(info=self._info, area_size="small-outer"), \
-                          self._optical_flow.serialize()
-
-                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
-        else:
-            self.receive(pipe_id=params.FRAME_LOADER_ID)
-
-            message = sequence_number, [], []
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
-
-            if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-                message = sequence_number, []
-                self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
+            self._send_message(target=params.CALIBRATOR_ID,
+                               sequence_number=sequence_number,
+                               block=False)
 
     def _hungarian_method(self, detected_boxes) -> None:
 
         matrix = []
-        for old_box in TrackedObject.boxes:
+        for old_object in self._tracked_object_repository.list:
             row = []
             for new_box in detected_boxes:
                 new_coordinates, new_size, new_score = new_box
 
                 new_coordinates.convert_to_fixed(self._info)
-                # if not self._info.update_area.contains(new_coordinates):
-                #     return
 
-                if old_box.in_radius(new_coordinates):
-                    row.append(old_box.center.distance(new_coordinates))
+                if old_object.in_radius(new_coordinates):
+                    row.append(old_object.center.distance(new_coordinates))
                 else:
-                    row.append(DISALLOWED)
+                    row.append(params.TRACKER_DISALLOWED)
             matrix.append(row)
 
-        munkres = Munkres()
-        indexes = munkres.compute(matrix)
-
+        indexes = self._munkres.compute(matrix)
         detected_boxes_copy = detected_boxes[:]
 
         for index, row in enumerate(transpose_matrix(matrix)):
-            if sum(row) != DISALLOWED * len(row):
+            if sum(row) != params.TRACKER_DISALLOWED * len(row):
                 detected_boxes.remove(detected_boxes_copy[index])
 
         for old_index, new_index in indexes:
 
             value = matrix[old_index][new_index]
 
-            if value < DISALLOWED:
-                old_box = TrackedObject.boxes[old_index]
+            if value < params.TRACKER_DISALLOWED:
+                old_box = self._tracked_object_repository.list[old_index]
                 new_box = detected_boxes_copy[new_index]
 
                 try:
@@ -151,12 +129,11 @@ class Tracker(ThreadedPipeBlock):
                 old_box.update_position(size, score, new_coordinates)
 
         for new_box in detected_boxes:
-            if new_box[2] > TrackedObject.MINIMAL_SCORE_NEW:
+            if new_box[2] > params.TRACKER_MINIMAL_SCORE:
                 coordinates, size, confident_score = new_box
 
                 if self._info.start_area.contains(coordinates):
-                    TrackedObject(*new_box, self._info, self)
+                    self._tracked_object_repository.new_tracked_object(*new_box)
 
-    def _control_boxes(self) -> None:
-        [TrackedObject.boxes.remove(box) for box in TrackedObject.boxes if not self._info.update_area.contains(box.center)]
+
 
