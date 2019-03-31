@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import params
 
-from bbox import Box2D, ObjectSize, Coordinates
+from bbox import TrackedObject, ObjectSize, Coordinates
 from pipeline import ThreadedPipeBlock
 
 
@@ -45,7 +45,7 @@ class Detector(ThreadedPipeBlock):
         final_boxes = []
         for _, pair in enumerate(zip(boxes[0], scores[0])):
             box, score = pair
-            if score < Box2D.MINIMAL_SCORE_CORRECTION:
+            if score < TrackedObject.MINIMAL_SCORE_CORRECTION:
                 break
 
             center, size = Detector.convert_box_to_centroid_object(box)

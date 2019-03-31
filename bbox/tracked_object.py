@@ -50,17 +50,25 @@ KALMAN_MESUREMENT_NOISE_COV = np.array([
 ], np.float32) * 1
 
 
-class Box2DRepository:
+class TrackedObjectsRepository:
     def __init__(self):
-        self.id_counter = 0
-        self.boxes = []
+        self._id_counter = 0
         self._lifelines = []
+        self._tracked_objects = []
 
-    def new_box(self):
-        raise NotImplementedError
+    def new_box(self, coordinates, size, confident_score, info):
+        new_object = TrackedObject(coordinates=coordinates,
+                                   size=size,
+                                   confident_score=confident_score,
+                                   info=info,
+                                   object_id=self._id_counter)
+
+        self._tracked_objects.append(new_object)
+        self._id_counter += 1
 
 
-class Box2D:
+
+class TrackedObject:
 
     id_counter = 0
     boxes = []
@@ -126,7 +134,7 @@ class Box2D:
             cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
 
         if lifelines is not None:
-            return Box2D.draw_lifelines(image, lifelines)
+            return TrackedObject.draw_lifelines(image, lifelines)
         else:
             return image
 
@@ -134,23 +142,23 @@ class Box2D:
     def all_boxes_mask(info, area_size="inner"):
         global_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
 
-        for box in Box2D.boxes:
+        for box in TrackedObject.boxes:
             global_mask = cv2.bitwise_or(global_mask, box.mask(info, area_size=area_size))
 
         return global_mask
 
     @staticmethod
     def lifelines():
-        return Box2D._lifelines
+        return TrackedObject._lifelines
 
-    def __init__(self, coordinates, size, confident_score, info, tracker):
+    def __init__(self, coordinates, size, confident_score, info, object_id):
 
         super().__init__()
 
         coordinates.convert_to_fixed(info)
         size.convert_to_fixed(info)
 
-        self._parent_tracker = tracker
+        self._id = object_id
         self._object_size = size
 
         self.score = confident_score
@@ -173,16 +181,11 @@ class Box2D:
             [np.float32(0)],  # dy
         ])
 
-        self._id = Box2D.id_counter
-
-        self._history = coordinates
-
-        Box2D.boxes.append(self)
-        Box2D.id_counter += 1
+        self._start_coordinates = coordinates
 
     @property
     def history(self):
-        return self._history
+        return self._start_coordinates
 
     @property
     def id(self) -> int:
@@ -248,7 +251,7 @@ class Box2D:
         self.lifetime += 1
         if self.center.y < self.history.y:
             if self.lifetime == 20:
-                Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
+                TrackedObject._lifelines.append((self.history.tuple(), self.center.tuple()))
 
     def update_position(self, size, score, new_coordinates) -> None:
 

@@ -2,7 +2,7 @@ import time
 import cv2
 import params
 
-from bbox import Box2D
+from bbox import TrackedObject
 from pipeline import PipeBlock
 from pipeline.pipeline import is_frequency
 
@@ -31,7 +31,7 @@ class VideoPlayer(PipeBlock):
         while True:
             tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-            image = Box2D.draw(image, boxes)
+            image = TrackedObject.draw(image, boxes)
 
             self._info.draw_vanishing_points(image)
 

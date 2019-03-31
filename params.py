@@ -14,9 +14,10 @@ DETECTOR_LIGHT_ID = 5
 CALIBRATOR_FREQUENCY = 20
 CALIBRATOR_FLOW_THRESHOLD = 0
 # CALIBRATOR_RANSAC_STEP_POINTS_COUNT = 300 # number of car tracks before estimating
-CALIBRATOR_RANSAC_THRESHOLD_RATIO = 0.015    # ransac acceptance of point threshold 0.03 (o.O15)
+CALIBRATOR_RANSAC_THRESHOLD_RATIO = 0.03    # ransac acceptance of point threshold 0.03 (o.O15)
 
-CALIBRATOR_TRACK_MINIMUM = 10               # not-used 300 (100)
+CALIBRATOR_VP1_TRACK_MINIMUM = 100               # not-used 300 (100)
+CALIBRATOR_VP2_TRACK_MINIMUM = 10
 CALIBRATOR_ANGLE_MIN = 30                   # minimal angle for the second vanishing point
 CALIBRATOR_GRID_DENSITY = 5                 # density of prepared vanishing point grid 10
 CALIBRATOR_MIN_LINE_LENGTH = 50             # 50

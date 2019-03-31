@@ -1,6 +1,6 @@
 import params
 
-from bbox import Box2D
+from bbox import TrackedObject
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock
 from munkres import Munkres
@@ -44,14 +44,14 @@ class Tracker(ThreadedPipeBlock):
         if self._info.track_boxes:
             self._update_from_predictor(sequence_number)
 
-            if len(Box2D.boxes):
+            if len(TrackedObject.boxes):
                 self._hungarian_method(detected_boxes)
             else:
                 for new_box in detected_boxes:
                     coordinates, size, confident_score = new_box
 
                     if self._info.start_area.contains(coordinates):
-                        Box2D(*new_box, self._info, self)
+                        TrackedObject(*new_box, self._info, self)
 
         else:
             self.receive(pipe_id=params.FRAME_LOADER_ID)
@@ -60,40 +60,40 @@ class Tracker(ThreadedPipeBlock):
                 coordinates, size, confident_score = new_box
 
                 if self._info.start_area.contains(coordinates):
-                    Box2D(*new_box, self._info, self)
+                    TrackedObject(*new_box, self._info, self)
 
-            message = sequence_number, [box.serialize() for box in Box2D.boxes], Box2D.lifelines()
+            message = sequence_number, [box.serialize() for box in TrackedObject.boxes], TrackedObject.lifelines()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
                 message = sequence_number, \
-                          Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
-                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer"), \
+                          TrackedObject.all_boxes_mask(info=self._info, area_size="outer"), \
+                          TrackedObject.all_boxes_mask(info=self._info, area_size="small-outer"), \
                           self._optical_flow.serialize()
 
                 self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
     def _update_from_predictor(self, sequence_number) -> None:
 
-        for box in Box2D.boxes:
+        for box in TrackedObject.boxes:
             if box.lifetime < 0:
-                Box2D.boxes.remove(box)
+                TrackedObject.boxes.remove(box)
 
         if self._info.track_boxes:
-            for box in Box2D.boxes:
+            for box in TrackedObject.boxes:
                 box.predict()
 
             if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
                 _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
                 self._optical_flow.update(new_frame)
 
-            message = sequence_number, [box.serialize() for box in Box2D.boxes], Box2D.lifelines()
+            message = sequence_number, [box.serialize() for box in TrackedObject.boxes], TrackedObject.lifelines()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
             if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
                 message = sequence_number, \
-                          Box2D.all_boxes_mask(info=self._info, area_size="outer"), \
-                          Box2D.all_boxes_mask(info=self._info, area_size="small-outer"), \
+                          TrackedObject.all_boxes_mask(info=self._info, area_size="outer"), \
+                          TrackedObject.all_boxes_mask(info=self._info, area_size="small-outer"), \
                           self._optical_flow.serialize()
 
                 self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
@@ -110,7 +110,7 @@ class Tracker(ThreadedPipeBlock):
     def _hungarian_method(self, detected_boxes) -> None:
 
         matrix = []
-        for old_box in Box2D.boxes:
+        for old_box in TrackedObject.boxes:
             row = []
             for new_box in detected_boxes:
                 new_coordinates, new_size, new_score = new_box
@@ -139,7 +139,7 @@ class Tracker(ThreadedPipeBlock):
             value = matrix[old_index][new_index]
 
             if value < DISALLOWED:
-                old_box = Box2D.boxes[old_index]
+                old_box = TrackedObject.boxes[old_index]
                 new_box = detected_boxes_copy[new_index]
 
                 try:
@@ -151,12 +151,12 @@ class Tracker(ThreadedPipeBlock):
                 old_box.update_position(size, score, new_coordinates)
 
         for new_box in detected_boxes:
-            if new_box[2] > Box2D.MINIMAL_SCORE_NEW:
+            if new_box[2] > TrackedObject.MINIMAL_SCORE_NEW:
                 coordinates, size, confident_score = new_box
 
                 if self._info.start_area.contains(coordinates):
-                    Box2D(*new_box, self._info, self)
+                    TrackedObject(*new_box, self._info, self)
 
     def _control_boxes(self) -> None:
-        [Box2D.boxes.remove(box) for box in Box2D.boxes if not self._info.update_area.contains(box.center)]
+        [TrackedObject.boxes.remove(box) for box in TrackedObject.boxes if not self._info.update_area.contains(box.center)]
 

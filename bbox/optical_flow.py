@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 import params
-from bbox import Box2D
+from bbox import TrackedObject
 
 LK_PARAMS = dict(winSize=(31, 31),
                  maxLevel=7,
@@ -53,7 +53,7 @@ class OpticalFlow:
 
         if self._previous_image is not None:
 
-            for box in Box2D.boxes:
+            for box in TrackedObject.boxes:
                 cv2.circle(mask_for_detection, box.center.tuple(), box.area("outer"), 255, -1)
 
             if self.tracked_point_count:
@@ -72,14 +72,14 @@ class OpticalFlow:
         self._previous_image = new_frame_gray
         self._features_to_track = np.zeros(shape=(0, 1, 2), dtype=np.float32)
 
-        if len(Box2D.boxes):
-            mask = Box2D.all_boxes_mask(self._info, area_size="inner")
+        if len(TrackedObject.boxes):
+            mask = TrackedObject.all_boxes_mask(self._info, area_size="inner")
             out_masked = cv2.bitwise_and(self._doter, mask)
 
             nonzero = cv2.findNonZero(out_masked)
 
             self._features_to_track = nonzero
-            for box in Box2D.boxes:
+            for box in TrackedObject.boxes:
 
                 box.update_flow(self._old_positions, self._new_positions)
 

@@ -102,8 +102,13 @@ class Info:
         # add corridors to image
         return cv2.add(image, corridor_mask)
 
-    def vp1_preset_points(self) -> ([], []):
-        return [int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2) for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY))], [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10) for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY))]
+    def vp1_preset_points(self) -> ([(int, int)]):
+        points = []
+        for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY)):
+            for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY)):
+                new_x = int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2)
+                new_y = int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10)
 
-    # def vp2_preset_points(self) -> ([], []):
-    #     return [int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2) for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY))], [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10) for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY))]
+                points.append((new_x, new_y))
+
+        return points
