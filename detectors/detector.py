@@ -8,10 +8,10 @@ from pipeline import ThreadedPipeBlock
 
 class Detector(ThreadedPipeBlock):
 
-    def __init__(self, model, detection_area, output=None, detector_type_id=params.DETECTOR_CAR_ID):
+    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID):
 
         super().__init__(pipe_id=detector_type_id, output=output)
-        self.detection_area = detection_area
+        self._info = info
         self.detection_graph = tf.Graph()
 
         with self.detection_graph.as_default():
@@ -51,8 +51,7 @@ class Detector(ThreadedPipeBlock):
             center, size = Detector.convert_box_to_centroid_object(box)
             new_box = (center, size, score)
 
-            if self.detection_area.contains(center, relative=True):
-                final_boxes.append(new_box)
+            final_boxes.append(new_box)
 
         return final_boxes
 
@@ -63,7 +62,7 @@ class Detector(ThreadedPipeBlock):
         x = (x_min + x_max)/2
         y = (y_min + y_max)/2
 
-        center = Coordinates(x, y)
+        center = Coordinates(x, y, relative=True)
 
         width = x_max - x_min
         height = y_max - y_min

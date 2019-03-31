@@ -16,13 +16,12 @@ def transpose_matrix(matrix):
 
 class Tracker(ThreadedPipeBlock):
 
-    def __init__(self, area_of_detection, info, calibrator, output=None):
+    def __init__(self, info, calibrator, output=None):
         super().__init__(pipe_id=params.TRACKER_ID, output=output)
 
         self.new_positions = []
         self.old_positions = []
 
-        self._area_of_detection = area_of_detection
         self._info = info
         self._points_to_track = None
 
@@ -48,12 +47,20 @@ class Tracker(ThreadedPipeBlock):
             if len(Box2D.boxes):
                 self._hungarian_method(detected_boxes)
             else:
-                Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
+                for new_box in detected_boxes:
+                    coordinates, size, confident_score = new_box
+
+                    if self._info.start_area.contains(coordinates):
+                        Box2D(*new_box, self._info, self)
 
         else:
             self.receive(pipe_id=params.FRAME_LOADER_ID)
 
-            Box2D.boxes = [Box2D(*new_box, self._info, self) for new_box in detected_boxes]
+            for new_box in detected_boxes:
+                coordinates, size, confident_score = new_box
+
+                if self._info.start_area.contains(coordinates):
+                    Box2D(*new_box, self._info, self)
 
             message = sequence_number, [box.serialize() for box in Box2D.boxes], Box2D.lifelines()
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
@@ -109,6 +116,9 @@ class Tracker(ThreadedPipeBlock):
                 new_coordinates, new_size, new_score = new_box
 
                 new_coordinates.convert_to_fixed(self._info)
+                # if not self._info.update_area.contains(new_coordinates):
+                #     return
+
                 if old_box.in_radius(new_coordinates):
                     row.append(old_box.center.distance(new_coordinates))
                 else:
@@ -140,8 +150,13 @@ class Tracker(ThreadedPipeBlock):
                 new_coordinates, size, score = new_box
                 old_box.update_position(size, score, new_coordinates)
 
-        Box2D.boxes += [Box2D(*new_box, self._info, self) for new_box in detected_boxes if new_box[2] > Box2D.MINIMAL_SCORE_NEW]
+        for new_box in detected_boxes:
+            if new_box[2] > Box2D.MINIMAL_SCORE_NEW:
+                coordinates, size, confident_score = new_box
+
+                if self._info.start_area.contains(coordinates):
+                    Box2D(*new_box, self._info, self)
 
     def _control_boxes(self) -> None:
-        [Box2D.boxes.remove(box) for box in Box2D.boxes if not self._area_of_detection.contains(box.center)]
+        [Box2D.boxes.remove(box) for box in Box2D.boxes if not self._info.update_area.contains(box.center)]
 

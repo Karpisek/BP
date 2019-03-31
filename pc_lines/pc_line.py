@@ -21,12 +21,15 @@ class PcLines:
         self.t_space = []
         self.s_space = []
 
-    def find_most_line_cross(self, info) -> object:
+    def find_most_line_cross(self, preset_points=None) -> object:
 
         pyplot.xlim((-self.delta, self.delta))
         pyplot.ylim((-self.delta, self.delta))
 
-        s_line, s_ratio = self.ransac_from_preset(info=info) # ransac
+        if preset_points is not None:
+            s_line, s_ratio = self.ransac_from_preset(preset_points=preset_points)
+        else:
+            s_line, s_ratio = self.ransac()
 
         x = s_line.find_coordinate(x=0)[1]
         y = s_line.find_coordinate(x=self.delta)[1]
@@ -44,9 +47,10 @@ class PcLines:
 
         return vp_s
 
-    def ransac_from_preset(self, info) -> (object, int):
-        preset_x_coordinates = [int(x * params.CALIBRATOR_GRID_DENSITY - info.width / 2) for x in range(int((2 * info.width) / params.CALIBRATOR_GRID_DENSITY))]
-        preset_y_coordinates = [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * info.height / 10) for y in range(int(info.height / params.CALIBRATOR_GRID_DENSITY))]
+    def ransac_from_preset(self, preset_points) -> (object, int):
+        preset_x_coordinates, preset_y_coordinates = preset_points
+        # preset_x_coordinates = [int(x * params.CALIBRATOR_GRID_DENSITY - info.width / 2) for x in range(int((2 * info.width) / params.CALIBRATOR_GRID_DENSITY))]
+        # preset_y_coordinates = [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * info.height / 10) for y in range(int(info.height / params.CALIBRATOR_GRID_DENSITY))]
 
         best_line_ratio = 0
         best_line = None
@@ -88,8 +92,8 @@ class PcLines:
 
                 if num >= best_line_ratio:
                     if best_line is not None:
-                        if line.find_coordinate(x=self.delta)[1] < best_y:
-                            if num == best_line_ratio:
+                        if num == best_line_ratio:
+                            if line.find_coordinate(x=self.delta)[1] > best_y:
                                 continue
 
                     best_line_ratio = num
@@ -120,16 +124,7 @@ class PcLines:
                     if distance < ransac_threshold:
                         num += 1
 
-                point2 = line.find_coordinate(x=0)
-                y = line.find_coordinate(x=self.delta)[1]
-                twisted_line = Line((-self.delta, -y), point2)
-
-                for point in t_points:
-                    distance = twisted_line.point_distance(point)
-
-                    if distance < ransac_threshold:
-                        num += 1
-
+                self.debug_spaces_print(line)
                 if num > best_line_ratio:
                     best_line_ratio = num
                     best_line = line
@@ -149,21 +144,16 @@ class PcLines:
                     if distance < ransac_threshold:
                         num += 1
 
-                point2 = line.find_coordinate(x=0)
-                y = line.find_coordinate(x=-self.delta)[1]
-                twisted_line = Line((self.delta, -y), point2)
-
-                for point in s_points:
-                    distance = twisted_line.point_distance(point)
-
-                    if distance < ransac_threshold:
-                        num += 1
-
+                self.debug_spaces_print(line)
                 if num > best_line_ratio:
                     best_line_ratio = num
-                    best_line = twisted_line
+                    best_line = line
 
         return best_line, best_line_ratio
+
+    def pc_line_from_angle(self, angle):
+        u = (2 * self.delta / 180) * angle
+        print(angle, u)
 
     def pc_line_from_points(self, point1, point2):
         x1, y1 = point1
@@ -197,9 +187,9 @@ class PcLines:
             pass
 
         if u is not None and v is not None:
-            if u < 0:
+            if 0 > u > -self.delta:
                 self.t_space.append(((u, v), magnitude))
-            else:
+            elif 0 < u < self.delta:
                 self.s_space.append(((u, v), magnitude))
 
     def plot(self) -> None:
@@ -214,13 +204,6 @@ class PcLines:
         pyplot.plot(x_val, y_val, 'bo')
         pyplot.show()
 
-    @staticmethod
-    def find_best_rated(points_with_magnitude):
-        points_with_magnitude.sort(key=lambda p: p[1], reverse=True)
-        ordered_space = [point[0] for point in points_with_magnitude[:params.CALIBRATOR_RANSAC_STEP_POINTS_COUNT]]
-
-        return ordered_space
-
     def debug_spaces_print(self, line) -> None:
         image = np.zeros(shape=(2 * self.delta, 2 * self.delta, 3))
 
@@ -233,6 +216,9 @@ class PcLines:
         x1 = self.delta
         x2 = 2 * self.delta
 
+        #
+        # print(line)
+        # print((x1, y1), (x2, y2))
         cv2.line(image, (x1, y1), (x2, y2), (0, 0, 255), int(params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta * 2))
 
         x1 = 0

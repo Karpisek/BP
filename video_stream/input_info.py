@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 import params
+from bbox import Area, Coordinates
 from pc_lines import TrafficCorridorRepository
 
 
@@ -12,11 +13,28 @@ class Info:
         self._fps = self.input.get(cv2.CAP_PROP_FPS)
         self._height = self.input.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self._width = self.input.get(cv2.CAP_PROP_FRAME_WIDTH)
+
         self._vanishing_points = []
+        self._traffic_lights = []
 
         self.track_boxes = True
 
         self._corridors_repository = TrafficCorridorRepository(self)
+        self._tracker_start_area = Area(info=self,
+                                        top_left=Coordinates(0, self.height/3),
+                                        bottom_right=Coordinates(self.width, self.height))
+
+        self._tracker_update_area = Area(info=self,
+                                         top_left=Coordinates(0, self.height/4),
+                                         bottom_right=Coordinates(self.width, self.height))
+
+    @property
+    def start_area(self):
+        return self._tracker_start_area
+
+    @property
+    def update_area(self):
+        return self._tracker_update_area
 
     @property
     def width(self) -> int:
@@ -83,3 +101,9 @@ class Info:
 
         # add corridors to image
         return cv2.add(image, corridor_mask)
+
+    def vp1_preset_points(self) -> ([], []):
+        return [int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2) for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY))], [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10) for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY))]
+
+    # def vp2_preset_points(self) -> ([], []):
+    #     return [int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2) for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY))], [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10) for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY))]

@@ -2,11 +2,11 @@ import numpy as np
 
 
 class Coordinates:
-    def __init__(self, x, y):
+    def __init__(self, x, y, relative=False):
         self.x = x
         self.y = y
 
-        self.is_relative = True
+        self.is_relative = relative
 
     def convert_to_fixed(self, info):
         if self.is_relative:

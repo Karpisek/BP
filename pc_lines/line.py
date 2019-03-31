@@ -30,15 +30,15 @@ class Line:
 
         if self.direction[1] == 0:
             coef = (self.direction[1] / self.direction[0])
-            self.a = -coef
+            self.a = round(-coef, 3)
             self.b = 1
-            self.c = -(self.origin[1] - self.origin[0] * coef)
+            self.c = round(-(self.origin[1] - self.origin[0] * coef), 3)
 
         else:
             coef = (self.direction[0] / self.direction[1])
             self.a = 1
-            self.b = -coef
-            self.c = -(self.origin[0] - self.origin[1] * coef)
+            self.b = round(-coef, 3)
+            self.c = round(-(self.origin[0] - self.origin[1] * coef), 3)
 
     @property
     def horizontal(self) -> bool:
@@ -114,11 +114,13 @@ class Line:
 
         if x is not None:
             if self.b == 0:
-                raise NotOnLineError
+                # raise ZeroDivisionError
+                return -self.c/self.a, x
             return x, ((-self.a) * x - self.c) / self.b
         else:
             if self.a == 0:
-                raise NotOnLineError
+                # raise ZeroDivisionError
+                return x, -self.c/self.b
             return ((-self.b) * y - self.c) / self.a, y
 
     def draw(self, image, color, thickness) -> None:

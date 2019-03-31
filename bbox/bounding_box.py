@@ -3,7 +3,7 @@ import numpy as np
 
 import params
 from bbox.coordinates import Coordinates
-from pc_lines.line import Line, SamePointError
+from pc_lines.line import Line, SamePointError, NotOnLineError
 
 COLOR_GREEN = (0, 255, 0)
 COLOR_BLUE = (255, 0, 0)
@@ -66,7 +66,6 @@ class Box2D:
     boxes = []
     _lifelines = []
 
-    MAX_LIFETIME = 25
     MINIMAL_SCORE_CORRECTION = 0.5
     MINIMAL_SCORE_NEW = 0.5
 
@@ -85,6 +84,10 @@ class Box2D:
                     image = cv2.add(image, mask)
                 except SamePointError:
                     continue
+                except NotOnLineError:
+                    print(p1, p2)
+                    raise
+
         return image
 
     @staticmethod
@@ -112,17 +115,20 @@ class Box2D:
             return hull
 
     @staticmethod
-    def draw(image, boxes, lifelines=None) -> None:
+    def draw(image, boxes, lifelines=None) -> np.ndarray:
 
         for box in boxes:
-            anchors, area_of_interest, car_info, flow_diff = box
+            anchors, area_of_interest, car_info = box
 
             top_left, bot_right, center_point, tracker = anchors
 
             cv2.circle(image, center_point, area_of_interest, COLOR_BLUE, BOX_THICKNESS)
             cv2.putText(image, car_info, top_left, 1, 1, COLOR_WHITE, 2)
 
-        Box2D.draw_lifelines(image, lifelines)
+        if lifelines is not None:
+            return Box2D.draw_lifelines(image, lifelines)
+        else:
+            return image
 
     @staticmethod
     def all_boxes_mask(info, area_size="inner"):
@@ -171,6 +177,7 @@ class Box2D:
 
         self._history = coordinates
 
+        Box2D.boxes.append(self)
         Box2D.id_counter += 1
 
     @property
@@ -238,7 +245,10 @@ class Box2D:
 
     def predict(self) -> None:
         self._kalman.predict()
-        self.lifetime -= 1
+        self.lifetime += 1
+        if self.center.y < self.history.y:
+            if self.lifetime == 20:
+                Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
 
     def update_position(self, size, score, new_coordinates) -> None:
 
@@ -260,8 +270,6 @@ class Box2D:
         self.score = score
         self._object_size = size
 
-        self.lifetime = Box2D.MAX_LIFETIME
-
     def update_flow(self, old_positions, new_positions) -> None:
         x_flow, y_flow = self.extract_flow(old_positions, new_positions)
 
@@ -274,8 +282,6 @@ class Box2D:
 
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
-
-        self.lifetime = Box2D.MAX_LIFETIME
 
     def in_radius(self, new_coordinates) -> int:
 
@@ -322,11 +328,11 @@ class Box2D:
         return mask
 
     def serialize(self):
-        return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
+        return self.anchors(), self.area(area_size="outer"), self.car_info
 
     def __del__(self):
-
+        pass
         # only lifelines from bot to top
-        if self.center.y < self.history.y:
-            Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
+        # if self.center.y < self.history.y:
+        #     Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
 

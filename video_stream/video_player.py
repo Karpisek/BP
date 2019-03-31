@@ -8,7 +8,7 @@ from pipeline.pipeline import is_frequency
 
 
 class VideoPlayer(PipeBlock):
-    def __init__(self, area_of_detection, info):
+    def __init__(self, info):
         super().__init__(pipe_id=params.VIDEO_PLAYER_ID)
 
         self._detector = None
@@ -17,8 +17,6 @@ class VideoPlayer(PipeBlock):
         self.calibrator = None
 
         self._info = info
-
-        self._area_of_detection = area_of_detection
 
     def start(self):
 
@@ -30,17 +28,14 @@ class VideoPlayer(PipeBlock):
         seq, image = self.receive(params.FRAME_LOADER_ID)
         frame_counter += 1
 
-        self._area_of_detection.select(self._info)
-
         while True:
             tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-            Box2D.draw(image, boxes)
+            image = Box2D.draw(image, boxes)
 
             self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
-            # self._area_of_detection.draw(image)
 
             image_calibrator = None
             if is_frequency(seq, params.CALIBRATOR_FREQUENCY):

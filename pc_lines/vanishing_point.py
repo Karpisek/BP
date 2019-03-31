@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-import sys
 
 import params
+from bbox import Coordinates
 
 
 class VanishingPointError(Exception):
@@ -28,6 +28,13 @@ class VanishingPoint:
         # in case vanishing point is near infinity
         if angle is not None:
             self.infinity = True
+
+    @property
+    def coordinates(self):
+        if self._point is not None:
+            return Coordinates(self._point[0], self._point[1])
+        else:
+            raise VanishingPointError
 
     @property
     def point(self):
