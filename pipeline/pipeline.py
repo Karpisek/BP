@@ -1,9 +1,14 @@
+import queue
 import time
 from queue import Queue
 from threading import Thread
 
 DEFAULT_NUMBER_INPUTS = 1
 DEFAULT_QUEUE_SIZE = 20
+
+
+def is_frequency(seq, frequency):
+    return seq % frequency == 0
 
 
 class PipeBlock:
@@ -22,14 +27,20 @@ class PipeBlock:
     def start(self):
         raise NotImplementedError
 
-    def send(self, message, pipe_id):
-        self._output[pipe_id].deliver(message, pipe_id=self.id)
+    def send(self, message, pipe_id, block=True):
+        self._output[pipe_id].deliver(message, pipe_id=self.id, block=block)
 
-    def deliver(self, message, pipe_id):
-        self._input[pipe_id].put(message)
+    def deliver(self, message, pipe_id: int, block):
+        try:
+            self._input[pipe_id].put(message, block=block)
+        except queue.Full:
+            return
 
-    def receive(self, pipe_id):
-        return self._input[pipe_id].get()
+    def receive(self, pipe_id, block=True):
+        try:
+            return self._input[pipe_id].get(block)
+        except queue.Empty:
+            return None
 
     def connect(self, sender, queue_size):
         self._input[sender.id] = Queue(queue_size)
@@ -45,10 +56,6 @@ class ThreadedPipeBlock(PipeBlock):
 
         self._thread = Thread(target=self._run)
         self._thread.daemon = True
-
-    @property
-    def stop(self):
-        return self._end
 
     def start(self):
         self._thread.start()

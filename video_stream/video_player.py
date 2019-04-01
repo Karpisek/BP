@@ -1,22 +1,21 @@
 import time
 import cv2
+import params
 
-from bbox import Box2D
-from bbox.optical_flow import OpticalFlow
-from params import TRACKER_ID, FRAME_LOADER_ID, VIDEO_PLAYER_ID
+from bbox import TrackedObject
 from pipeline import PipeBlock
+from pipeline.pipeline import is_frequency
 
 
 class VideoPlayer(PipeBlock):
-    def __init__(self, area_of_detection, info):
-        super().__init__(pipe_id=VIDEO_PLAYER_ID)
+    def __init__(self, info):
+        super().__init__(pipe_id=params.VIDEO_PLAYER_ID)
 
         self._detector = None
         self._loader = None
         self._tracker = None
-        self._info = info
 
-        self._area_of_detection = area_of_detection
+        self._info = info
 
     def start(self):
 
@@ -25,22 +24,29 @@ class VideoPlayer(PipeBlock):
         clock = time.time()
         frame_counter = 0
 
-        seq, image = self.receive(FRAME_LOADER_ID)
+        seq, image = self.receive(params.FRAME_LOADER_ID)
         frame_counter += 1
 
-        self._area_of_detection.select(cv2.selectROI("image", image), self._info)
-
         while True:
-            tracker_seq, boxes, serialized_optical_flow = self.receive(pipe_id=TRACKER_ID)
+            tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-            [Box2D.draw(image, *serialized_box) for serialized_box in boxes]
+            image = TrackedObject.draw(image, boxes)
 
-            self._area_of_detection.draw(image)
+            self._info.draw_vanishing_points(image)
 
-            mask = OpticalFlow.draw(image, serialized_optical_flow=serialized_optical_flow)
+            image_with_corridors = self._info.draw_corridors(image)
+            # image_with_corridors = image
 
-            cv2.imshow("image", cv2.add(image, mask))
-            key = cv2.waitKey(1)
+            image_calibrator = None
+            if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+                image_calibrator = self.receive(pipe_id=params.CALIBRATOR_ID, block=False)
+
+            if image_calibrator is not None:
+                cv2.imshow("image", image_calibrator)
+            else:
+                cv2.imshow("image", image_with_corridors)
+
+            key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
             #  commands
             if key & 0xFF == ord("q"):
@@ -55,7 +61,7 @@ class VideoPlayer(PipeBlock):
                 frame_counter = 0
                 clock = time.time()
 
-            seq, image = self.receive(FRAME_LOADER_ID)
+            seq, image = self.receive(params.FRAME_LOADER_ID)
             frame_counter += 1
 
         cv2.destroyAllWindows()
