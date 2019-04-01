@@ -14,7 +14,6 @@ class VideoPlayer(PipeBlock):
         self._detector = None
         self._loader = None
         self._tracker = None
-        self.calibrator = None
 
         self._info = info
 
@@ -36,6 +35,7 @@ class VideoPlayer(PipeBlock):
             self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
+            # image_with_corridors = image
 
             image_calibrator = None
             if is_frequency(seq, params.CALIBRATOR_FREQUENCY):

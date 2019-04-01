@@ -8,11 +8,12 @@ from pipeline import ThreadedPipeBlock
 
 class Detector(ThreadedPipeBlock):
 
-    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID):
+    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True):
 
         super().__init__(pipe_id=detector_type_id, output=output)
         self._info = info
         self.detection_graph = tf.Graph()
+        self._block = block
 
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
@@ -27,48 +28,48 @@ class Detector(ThreadedPipeBlock):
             self.d_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
             self.d_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
             self.num_d = self.detection_graph.get_tensor_by_name('num_detections:0')
+
         self.sess = tf.Session(graph=self.detection_graph)
 
     def _step(self, seq):
         seq, image = self.receive(params.FRAME_LOADER_ID)
         img_expanded = np.expand_dims(image, axis=0)
 
-        (boxes, scores, classes, num) = self.sess.run(
+        (boxes, scores, _, _) = self.sess.run(
             [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
             feed_dict={self.image_tensor: img_expanded})
 
-        packet_boxes = self.parse_boxes(boxes, scores)
-        self.send(packet_boxes, pipe_id=params.TRACKER_ID)
+        packet_boxes = self.parse_boxes(boxes[0], scores[0])
 
-    @staticmethod
-    def parse_boxes(boxes, scores):
+        self.send(packet_boxes, pipe_id=list(self._output.keys())[0], block=self._block)
+
+    def parse_boxes(self, boxes, scores) -> [(Coordinates, ObjectSize, float)]:
 
         final_boxes = []
-        for _, pair in enumerate(zip(boxes[0], scores[0])):
+        for _, pair in enumerate(zip(boxes, scores)):
             box, score = pair
 
-            if score < params.TRACKER_MINIMAL_SCORE:
+            if score < params.DETECTOR_MINIMAL_SCORE:
                 break
 
-            center, size = Detector.convert_box_to_centroid_object(box)
+            center, size = self.convert_box_to_centroid_object(box)
             new_box = (center, size, score)
 
             final_boxes.append(new_box)
 
         return final_boxes
 
-    @staticmethod
-    def convert_box_to_centroid_object(box):
+    def convert_box_to_centroid_object(self, box) -> (Coordinates, ObjectSize):
         y_min, x_min, y_max, x_max = box
 
         x = (x_min + x_max)/2
         y = (y_min + y_max)/2
 
-        center = Coordinates(x, y, relative=True)
+        center = Coordinates(x, y, info=self._info)
 
         width = x_max - x_min
         height = y_max - y_min
 
-        size = ObjectSize(width, height)
+        size = ObjectSize(width, height, info=self._info)
 
         return center, size

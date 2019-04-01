@@ -63,14 +63,18 @@ class PcLines:
         preset_line = None
 
         if preset_points is not None:
+            print("1")
             preset_line, preset_ratio = self.ransac_from_preset(preset_pc_points=preset_points)
 
         if not only_preset:
+            print("2")
             line, ratio = self.ransac()
 
         if preset_ratio > ratio:
             ratio = preset_ratio
             line = preset_line
+
+        print("3")
 
         u1, v1 = line.find_coordinate(x=0)
         u2, v2 = line.find_coordinate(x=self.delta)
@@ -150,8 +154,6 @@ class PcLines:
         best_line_ratio = 0
         best_line = None
 
-        print(len(self.s_points))
-
         for point1 in self.s_points:
             for point2 in self.s_points:
                 try:
@@ -167,7 +169,7 @@ class PcLines:
                     if distance < ransac_threshold:
                         num += 1
 
-                self.debug_spaces_print(line)
+                # self.debug_spaces_print(line)
                 if num > best_line_ratio:
                     best_line_ratio = num
                     best_line = line

@@ -14,19 +14,27 @@ class NotOnLineError(Exception):
 
 
 class Line:
-    def __init__(self, point1, point2):
+    def __init__(self, point1, point2=None, direction=None):
 
         if point1 == point2:
             raise SamePointError
+
+        if point2 is None and direction is None:
+            raise SamePointError
         
         x1, y1 = point1
-        x2, y2 = point2
 
-        dx = x2 - x1
-        dy = y2 - y1
+        if point2 is not None:
+            x2, y2 = point2
 
-        self.origin = [x1, y1]
-        self.direction = [dx, dy]
+            dx = x2 - x1
+            dy = y2 - y1
+
+        else:
+            dx, dy = direction
+
+        self._origin = [x1, y1]
+        self._direction = [dx, dy]
 
         if self.direction[1] == 0:
             coef = (self.direction[1] / self.direction[0])
@@ -41,6 +49,14 @@ class Line:
             self.c = round(-(self.origin[0] - self.origin[1] * coef), 3)
 
     @property
+    def origin(self) -> [float, float]:
+        return self._origin
+
+    @property
+    def direction(self) -> [float, float]:
+        return self._direction
+
+    @property
     def horizontal(self) -> bool:
         return self.direction[1] == 0
 
@@ -51,6 +67,9 @@ class Line:
     @property
     def magnitude(self) -> float:
         return np.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+
+    def normal_direction(self) -> (float, float):
+        return self.a, self.b
 
     def angle(self, line2) -> float:
         if np.dot(self.direction, line2.direction) == 0:
@@ -114,12 +133,10 @@ class Line:
 
         if x is not None:
             if self.b == 0:
-                # raise ZeroDivisionError
                 return -self.c/self.a, x
             return x, ((-self.a) * x - self.c) / self.b
         else:
             if self.a == 0:
-                # raise ZeroDivisionError
                 return x, -self.c/self.b
             return ((-self.b) * y - self.c) / self.a, y
 

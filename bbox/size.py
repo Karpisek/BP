@@ -1,13 +1,8 @@
 class ObjectSize:
-    def __init__(self, w, h):
+    def __init__(self, w, h, info=None):
         self.width = w
         self.height = h
 
-        self.is_relative = True
-
-    def convert_to_fixed(self, info):
-        if self.is_relative:
+        if info is not None:
             self.width *= info.width
             self.height *= info.height
-
-            self.is_relative = False

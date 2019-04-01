@@ -1,5 +1,7 @@
 import cv2
+import numpy as np
 
+import params
 
 COLOR_AREA = (255, 255, 204)
 AREA_THICKNESS = 3
@@ -27,23 +29,30 @@ class Area:
     def anchors(self):
         return self._top_left, self._bot_right
 
-    def contains(self, coordinates):
+    def contains(self, coordinates) -> bool:
         if not self.defined:
             return False
 
-        if coordinates.is_relative:
-            coordinates.convert_to_fixed(self._info)
+        if not self._info.corridors_repository.ready:
+            if coordinates.x < self._top_left.x:
+                return False
 
-        if coordinates.x < self._top_left.x:
-            return False
+            if coordinates.y < self._top_left.y:
+                return False
 
-        if coordinates.y < self._top_left.y:
-            return False
+            if coordinates.x > self._bot_right.x:
+                return False
 
-        if coordinates.x > self._bot_right.x:
-            return False
+            if coordinates.y > self._bot_right.y:
+                return False
 
-        if coordinates.y > self._bot_right.y:
-            return False
+        else:
+            return self._info.corridors_repository.get_corridor(coordinates=coordinates)
 
         return True
+
+    def mask(self):
+        mask = np.zeros(shape=(self._info.height, self._info.width), dtype=np.uint8)
+        cv2.rectangle(mask, self._top_left.tuple(), self._bot_right.tuple(), params.COLOR_WHITE_MONO, params.FILL)
+
+        return mask

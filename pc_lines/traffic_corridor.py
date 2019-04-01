@@ -13,8 +13,18 @@ class TrafficCorridorRepository:
         self._corridor_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
 
     @property
+    def ready(self):
+        return self._ready
+
+    @property
     def corridor_mask(self):
         return self._corridor_mask
+
+    def get_corridor(self, coordinates) -> int:
+        if 0 < coordinates.x < self._info.width and 0 < coordinates.y < self._info.height:
+            return self._corridor_mask[int(coordinates.y)][int(coordinates.x)]
+        else:
+            return 0
 
     def get_mask(self) -> np.ndarray:
 
@@ -24,6 +34,8 @@ class TrafficCorridorRepository:
         if self._ready:
             for key, corridor in self._corridors.items():
                 corridor.draw_corridor(image, self._info, color=params.RANDOM_COLOR[key])
+
+        image = cv2.bitwise_and(image, image, mask=self._corridor_mask)
 
         return image
 
@@ -35,7 +47,9 @@ class TrafficCorridorRepository:
 
         self._corridors[new_corridor.id] = new_corridor
 
-        new_corridor.draw_corridor(self._corridor_mask, self._info)
+        new_corridor.draw_corridor(image=self._corridor_mask,
+                                   info=self._info,
+                                   color=self._corridors_count)
 
     def find_corridors(self, lifelines_mask):
 
@@ -92,9 +106,11 @@ class TrafficCorridorRepository:
 
             self.create_new_corridor(tuple(points[0]), tuple(points[1]))
 
-        cv2.imwrite("mask.jpg", self.get_mask())
-        cv2.imwrite("lifeline.jpg", frame_edge)
-        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
+        # cv2.imwrite("mask.jpg", self.get_mask())
+        # cv2.imwrite("lifeline.jpg", frame_edge)
+        # cv2.imwrite("lifeline_before.jpg", lifelines_mask)
+
+        self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
         self._ready = True
 
 
@@ -126,7 +142,10 @@ class TrafficCorridor:
         middle_point = int((self.left_point[0] + self.right_point[0]) / 2), int((self.left_point[1] + self.right_point[1]) / 2)
 
         mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
-        cv2.floodFill(image, mask_with_border, middle_point, color)
+        cv2.floodFill(image=image,
+                      mask=mask_with_border,
+                      seedPoint=middle_point,
+                      newVal=color)
 
     def __str__(self):
         return f"coridor: id [{self.id}], coord ({self.left_point}, {self.right_point})"

@@ -3,6 +3,7 @@ import numpy as np
 
 import params
 from bbox import Area, Coordinates
+from detectors import TrafficLightsRepository
 from pc_lines import TrafficCorridorRepository
 
 
@@ -20,6 +21,8 @@ class Info:
         self.track_boxes = True
 
         self._corridors_repository = TrafficCorridorRepository(self)
+        # self._traffic_lights_repository = TrafficLightsRepository()
+
         self._tracker_start_area = Area(info=self,
                                         top_left=Coordinates(0, self.height/3),
                                         bottom_right=Coordinates(self.width, self.height))
@@ -27,6 +30,10 @@ class Info:
         self._tracker_update_area = Area(info=self,
                                          top_left=Coordinates(0, self.height/4),
                                          bottom_right=Coordinates(self.width, self.height))
+
+    @property
+    def principal_point(self) -> Coordinates:
+        return Coordinates(self.width / 2, self.height / 2)
 
     @property
     def start_area(self):
@@ -76,19 +83,19 @@ class Info:
         if not self.calibrated:
             return
 
-        p6 = 0, int(self.height)
-        p7 = 1 * int(self.width / 4), int(3 * self.height / 4)
-        p8 = 2 * int(self.width / 4), int(3 * self.height / 4)
-        p9 = 3 * int(self.width / 4), int(3 * self.height / 4)
-        p10 = 4 * int(self.width / 4), int(3 * self.height / 4)
+        points = [(0, int(self.height)),
+                  (1 * int(self.width / 4), int(3 * self.height / 4)),
+                  (2 * int(self.width / 4), int(3 * self.height / 4)),
+                  (3 * int(self.width / 4), int(3 * self.height / 4)),
+                  (4 * int(self.width / 4), int(3 * self.height / 4))]
 
         for i in range(len(self.vanishing_points)):
-            cv2.circle(image, self.vanishing_points[i].point, 2, params.COLOR_RED, 1)
-            cv2.line(image, p6, self.vanishing_points[i].point, params.COLOR_GREEN, 1)
-            cv2.line(image, p7, self.vanishing_points[i].point, params.COLOR_GREEN, 1)
-            cv2.line(image, p8, self.vanishing_points[i].point, params.COLOR_GREEN, 1)
-            cv2.line(image, p9, self.vanishing_points[i].point, params.COLOR_GREEN, 1)
-            cv2.line(image, p10, self.vanishing_points[i].point, params.COLOR_GREEN, 1)
+            for p in points:
+
+                self.vanishing_points[i].draw_line(image=image,
+                                                   point=p,
+                                                   color=params.RANDOM_COLOR[i],
+                                                   thickness=1)
 
         return image
 

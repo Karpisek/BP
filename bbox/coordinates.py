@@ -2,18 +2,13 @@ import numpy as np
 
 
 class Coordinates:
-    def __init__(self, x, y, relative=False):
+    def __init__(self, x, y, info=None):
         self.x = x
         self.y = y
 
-        self.is_relative = relative
-
-    def convert_to_fixed(self, info):
-        if self.is_relative:
+        if info is not None:
             self.x *= info.width
             self.y *= info.height
-
-            self.is_relative = False
 
     def distance(self, next_point):
 
@@ -28,17 +23,6 @@ class Coordinates:
 
     def tuple(self) -> (int, int):
         return int(self.x), int(self.y)
-
-    @staticmethod
-    def fixed_to_relative(coordinate, dimension):
-        return coordinate / dimension
-
-    @staticmethod
-    def relative_to_fixed(coordinate, dimension):
-        return coordinate * dimension
-
-    def get_fixed(self, info):
-        return self.x * info.width, self.y * info.height
 
     def __str__(self):
         return f"x:{self.x} y:{self.y}"

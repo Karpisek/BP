@@ -46,6 +46,10 @@ KALMAN_MESUREMENT_NOISE_COV = np.array([
 ], np.float32) * 1
 
 
+class TooManyCarsError(Exception):
+    pass
+
+
 class TrackedObjectsRepository:
     def __init__(self, info):
         self._id_counter = 0
@@ -80,35 +84,55 @@ class TrackedObjectsRepository:
         global_mask = np.zeros(shape=(height, width),
                                dtype=np.uint8)
 
-        for tracked_object in self._tracked_objects:
-            global_mask = cv2.bitwise_or(global_mask, tracked_object.mask(width=width,
-                                                                          height=height,
-                                                                          area_size=area_size))
+        for index, tracked_object in enumerate(self._tracked_objects[::-1]):
+            global_mask = np.maximum(global_mask, tracked_object.mask(width=width,
+                                                                      height=height,
+                                                                      area_size=area_size,
+                                                                      color=params.COLOR_WHITE_MONO))
 
         return global_mask
 
     def predict(self) -> None:
         for tracked_object in self._tracked_objects:
-            tracked_object.predict()
+            new_lifeline = tracked_object.predict()
 
-            # if new_lifeline is not None:
-            #     self._lifelines.append(new_lifeline)
+            if new_lifeline is not None:
+                self._lifelines.append(new_lifeline)
 
     def control_boxes(self) -> None:
+
         for tracked_object in self._tracked_objects:
             if not self._info.update_area.contains(tracked_object.center):
-                starting_coordinates = tracked_object.history
-                end_coordinates = tracked_object.center
 
-                if end_coordinates.y < starting_coordinates.y:
-                    self._lifelines.append((starting_coordinates.tuple(), end_coordinates.tuple()))
+                if tracked_object.lifetime > 0:
+                    if tracked_object.history.y > tracked_object.center.y:
+                        self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
 
                 self._tracked_objects.remove(tracked_object)
 
-        # [self._tracked_objects.remove(tracked_object) for tracked_object in self._tracked_objects if not self._info.update_area.contains(tracked_object.center)]
+        # self._suppression()
 
     def serialize(self):
         return [tracked_object.serialize() for tracked_object in self._tracked_objects]
+
+    # def _suppression(self):
+    #     area_size = "outer"
+    #
+    #     global_mask = self.all_boxes_mask(area_size=area_size)
+    #
+    #     for index, tracked_object in enumerate(self._tracked_objects[::-1]):
+    #         color = index + 1
+    #         ideal_content_size = tracked_object.size.height * tracked_object.size.width
+    #
+    #         left_anchor, right_anchor, _ = tracked_object.anchors()
+    #         object_mask = global_mask[left_anchor[0]: right_anchor[0], left_anchor[1]:right_anchor[1]]
+    #
+    #         no_overlap_content_size = len(np.where(object_mask.reshape(-1) <= color)[0])
+    #
+    #         print(no_overlap_content_size / ideal_content_size)
+    #         if no_overlap_content_size / ideal_content_size < params.TRACKER_SUPPRESSION_MIN:
+    #             self._tracked_objects.remove(tracked_object)
+    #             print("here")
 
 
 class TrackedObject:
@@ -178,9 +202,6 @@ class TrackedObject:
 
         super().__init__()
 
-        coordinates.convert_to_fixed(info)
-        size.convert_to_fixed(info)
-
         self._id = object_id
         self._object_size = size
 
@@ -189,7 +210,7 @@ class TrackedObject:
         self._info = info
         self._kalman = cv2.KalmanFilter(4, 4)
 
-        self.lifetime = 0
+        self.lifetime = params.TRACKER_LIFELINE
 
         self._kalman.transitionMatrix = KALMAN_TRANSITION_MATRIX
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
@@ -244,18 +265,20 @@ class TrackedObject:
     def car_info(self) -> str:
         return str(self._id)
 
+    @property
+    def radius(self):
+        return int(np.sqrt(self.size.width * self.size.width + self.size.height * self.size.height) / 2)
+
     def area(self, area_size) -> int:
-        width = self.size.width
-        height = self.size.height
-
-        diagonal = np.sqrt(width * width + height * height)
-
         if area_size == "inner":
-            return int(diagonal/2) if int(diagonal/2) < 20 else 20
+            return self.radius if self.radius < 20 else 20
+
         if area_size == "outer":
-            return int(diagonal / 2)
+            return self.radius
+
         if area_size == "small-outer":
-            return int((diagonal - 3) / 2)
+            return self.radius - 3
+
         else:
             return 0
 
@@ -264,18 +287,13 @@ class TrackedObject:
 
     def predict(self) -> ((float, float), (float, float)) or None:
         self._kalman.predict()
-        self.lifetime += 1
-        # if self.center.y < self.history.y:
-        #     if self.lifetime == 20:
-        #         return self.history.tuple(), self.center.tuple()
+        self.lifetime -= 1
+
+        if self.center.y < self.history.y:
+            if self.lifetime == 0:
+                return self.history.tuple(), self.center.tuple()
 
     def update_position(self, size, score, new_coordinates) -> None:
-
-        # self._history = new_coordinates
-
-        size.convert_to_fixed(self._info)
-        new_coordinates.convert_to_fixed(info=self._info)
-
         mesurement = np.array([
             [np.float32(new_coordinates.x)],
             [np.float32(new_coordinates.y)],
@@ -339,12 +357,12 @@ class TrackedObject:
         else:
             return 0, 0
 
-    def mask(self, width, height, area_size="inner") -> np.ndarray:
+    def mask(self, width, height, area_size="inner", color=params.COLOR_WHITE_MONO) -> np.ndarray:
         mask = np.zeros(shape=(height, width), dtype=np.uint8)
         cv2.circle(img=mask,
                    center=self.center.tuple(),
                    radius=self.area(area_size),
-                   color=params.COLOR_WHITE_MONO,
+                   color=color,
                    thickness=params.FILL)
 
         return mask

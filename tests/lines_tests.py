@@ -75,14 +75,3 @@ class LinearFunctionTests(unittest.TestCase):
     #     self.assertEqual(l2.distance(p1), 0)
     #     self.assertEqual(l1.distance(p1), 1)
     #
-    def test_parse_to_line(self):
-        l1 = Line((0, 0), (1, 0))
-        self.assertEqual(l1.find_coordinate(x=2), (2, 0))
-
-        l1 = Line((0, 1), (0, 0))
-        with self.assertRaises(NotOnLineError):
-            l1.find_coordinate(x=2)
-
-        l1 = Line((0, 0), (5, 0))
-        with self.assertRaises(NotOnLineError):
-            l1.find_coordinate(y=2)

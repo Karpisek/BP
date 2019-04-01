@@ -12,7 +12,7 @@ IMAGE_WIDTH_FOR_CNN = 900
 
 
 class FrameLoader(ThreadedPipeBlock):
-    def __init__(self, output, input_info):
+    def __init__(self, output, info):
         """
         Loads frames from given path and saves them in Queue
         async using multiprocessing
@@ -20,7 +20,7 @@ class FrameLoader(ThreadedPipeBlock):
         """
 
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
-        self._info = input_info
+        self._info = info
         self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
                                                               varThreshold=params.FRAME_LOADER_THRESHOLD)
 
@@ -51,7 +51,7 @@ class FrameLoader(ThreadedPipeBlock):
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.TRACKER_ID)
 
-        if is_frequency(seq, params.DETECTOR_FREQUENCY):
+        if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):
 
             height, width, _ = image.shape
             scale = height / width
@@ -59,3 +59,11 @@ class FrameLoader(ThreadedPipeBlock):
 
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.DETECTOR_CAR_ID)
+
+        if is_frequency(seq, params.DETECTOR_LIGHT_FREQUENCY):
+            height, width, _ = image.shape
+            scale = height / width
+            image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
+
+            message = (seq, np.copy(image))
+            self.send(message, pipe_id=params.DETECTOR_LIGHT_ID)

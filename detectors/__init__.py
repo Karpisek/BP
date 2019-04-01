@@ -1,1 +1,2 @@
-from .detector import Detector
+from .traffic_light import *
+from .detector import *
