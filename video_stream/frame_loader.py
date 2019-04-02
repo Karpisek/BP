@@ -46,6 +46,10 @@ class FrameLoader(ThreadedPipeBlock):
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
+        if is_frequency(seq, params.TRAFFIC_LIGHT_OBSERVER_FREQUENCY):
+            message = (seq, np.copy(image))
+            self.send(message, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+
         if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)

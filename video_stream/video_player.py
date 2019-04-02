@@ -27,17 +27,14 @@ class VideoPlayer(PipeBlock):
         seq, image = self.receive(params.FRAME_LOADER_ID)
         frame_counter += 1
 
-        self._info.traffic_lights_repository.new_traffic_light(*cv2.selectROI("image", image))
-
         while True:
             observer_seq, boxes = self.receive(pipe_id=params.OBSERVER_ID)
 
             [box.draw(image) for box in boxes]
 
-            self._info.draw_vanishing_points(image)
+            # self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
-            self._info.traffic_lights_repository.status(image)
 
             image_calibrator = None
             if is_frequency(seq, params.CALIBRATOR_FREQUENCY):

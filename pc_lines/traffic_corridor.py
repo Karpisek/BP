@@ -2,41 +2,69 @@ import cv2
 import numpy as np
 
 import params
+from pc_lines.line import Line, SamePointError
+from pc_lines.pc_line import PcLines
 
 
 class TrafficCorridorRepository:
     def __init__(self, info):
-        self._ready = False
+        self._corridors_found = False
+        self._stopline_found = False
+
         self._info = info
         self._corridors = {}
         self._corridors_count = 0
         self._corridor_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
         self._stop_line = None
 
+        self._stop_places = []
+
+        self._pc_lines = PcLines(info.width)
+
+    @property
+    def count(self):
+        return self._corridors_count
+
     @property
     def ready(self):
-        return self._ready
+        return self._corridors_found and self._stopline_found
 
     @property
     def corridor_mask(self):
         return self._corridor_mask
 
+    def red_line_crossed(self, coordinates):
+        if not self.ready:
+            return False
+
+        red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
+        return red_line_point[1] > coordinates.y
+
     def get_corridor(self, coordinates) -> int:
         if 0 < coordinates.x < self._info.width and 0 < coordinates.y < self._info.height:
-            return self._corridor_mask[int(coordinates.y)][int(coordinates.x)]
+            return self._corridor_mask[int(coordinates.y)][int(coordinates.x)] - 1
         else:
-            return 0
+            return -1
 
-    def get_mask(self) -> np.ndarray:
+    def get_mask(self, fill) -> np.ndarray:
 
         image = np.zeros(shape=(self._info.height, self._info.width, 3),
                          dtype=np.uint8)
 
-        if self._ready:
+        if self._corridors_found:
             for key, corridor in self._corridors.items():
-                corridor.draw_corridor(image, self._info, color=params.RANDOM_COLOR[key])
+                corridor.draw_corridor(image=image,
+                                       info=self._info,
+                                       color=params.RANDOM_COLOR[key],
+                                       fill=fill,
+                                       thickness=params.CORRIDORS_VISUALIZATION_THICKNESS)
 
         image = cv2.bitwise_and(image, image, mask=self._corridor_mask)
+
+        if self._stopline_found:
+            self._stop_line.draw(image=image,
+                                 color=params.COLOR_RED,
+                                 thickness=5)
 
         return image
 
@@ -112,10 +140,43 @@ class TrafficCorridorRepository:
         # cv2.imwrite("lifeline_before.jpg", lifelines_mask)
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
-        self._ready = True
+        self._corridors_found = True
 
-    def create_stop_line(self):
-        raise NotImplementedError
+    def add_stop_point(self, coordinates):
+        self._stop_places.append(coordinates)
+
+        if len(self._stop_places) > params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
+            self.find_stop_line()
+
+    def find_stop_line(self):
+
+        best_line_ratio = 0
+        best_line = None
+
+        vp2 = self._info.vanishing_points[1]
+
+        for point2 in self._stop_places:
+            try:
+                line = Line(vp2.point, point2.tuple())
+            except SamePointError:
+                continue
+
+            num = 0
+            ransac_threshold = params.CORRIDORS_RANSAC_THRESHOLD
+            for point in self._stop_places:
+                distance = line.point_distance(point.tuple())
+
+                if distance < ransac_threshold:
+                    num += 1
+
+            # self.debug_spaces_print(line)
+            if num > best_line_ratio:
+                best_line_ratio = num
+                best_line = line
+
+
+        self._stop_line = best_line
+        self._stopline_found = True
 
 
 class TrafficCorridor:
@@ -130,26 +191,45 @@ class TrafficCorridor:
     def id(self):
         return self._id
 
-    def draw_corridor(self, image, info, color=None):
+    def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
         mask = np.zeros(shape=(info.height, info.width),
                         dtype=np.uint8)
 
         if color is None:
             color = self.id
 
-        cv2.line(image, self.left_point, info.vanishing_points[0].point, color)
-        cv2.line(mask, self.left_point, info.vanishing_points[0].point, color)
+        cv2.line(img=image,
+                 pt1=self.left_point,
+                 pt2=info.vanishing_points[0].point,
+                 color=color,
+                 thickness=thickness)
 
-        cv2.line(image, self.right_point, info.vanishing_points[0].point, color)
-        cv2.line(mask, self.right_point, info.vanishing_points[0].point, color)
+        cv2.line(img=mask,
+                 pt1=self.left_point,
+                 pt2=info.vanishing_points[0].point,
+                 color=color,
+                 thickness=thickness)
 
-        middle_point = int((self.left_point[0] + self.right_point[0]) / 2), int((self.left_point[1] + self.right_point[1]) / 2)
+        cv2.line(img=image,
+                 pt1=self.right_point,
+                 pt2=info.vanishing_points[0].point,
+                 color=color,
+                 thickness=thickness)
 
-        mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
-        cv2.floodFill(image=image,
-                      mask=mask_with_border,
-                      seedPoint=middle_point,
-                      newVal=color)
+        cv2.line(img=mask,
+                 pt1=self.right_point,
+                 pt2=info.vanishing_points[0].point,
+                 color=color,
+                 thickness=thickness)
+
+        if fill:
+            middle_point = int((self.left_point[0] + self.right_point[0]) / 2), int((self.left_point[1] + self.right_point[1]) / 2)
+
+            mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
+            cv2.floodFill(image=image,
+                          mask=mask_with_border,
+                          seedPoint=middle_point,
+                          newVal=color)
 
     def __str__(self):
         return f"coridor: id [{self.id}], coord ({self.left_point}, {self.right_point})"

@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 
 import params
-from bbox import Coordinates
 from pc_lines.line import Line
 
 
@@ -18,8 +17,6 @@ class VanishingPoint:
         if point is None and direction is None:
             raise VanishingPointError
 
-
-
         # in case vanishing point is defined
         if point is not None:
             self.infinity = False
@@ -30,13 +27,6 @@ class VanishingPoint:
         if direction is not None:
             self.infinity = True
             self._direction = direction
-
-    @property
-    def coordinates(self):
-        if self._point is not None:
-            return Coordinates(self._point[0], self._point[1])
-        else:
-            raise VanishingPointError
 
     @property
     def point(self):

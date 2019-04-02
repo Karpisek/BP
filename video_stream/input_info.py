@@ -3,7 +3,6 @@ import numpy as np
 
 import params
 from bbox import Area, Coordinates
-from detectors import TrafficLightsRepository
 from pc_lines import TrafficCorridorRepository
 
 
@@ -21,7 +20,6 @@ class Info:
         self.track_boxes = True
 
         self._corridors_repository = TrafficCorridorRepository(self)
-        self._traffic_lights_repository = TrafficLightsRepository(self)
 
         self._tracker_start_area = Area(info=self,
                                         top_left=Coordinates(0, self.height/3),
@@ -32,10 +30,6 @@ class Info:
                                          bottom_right=Coordinates(self.width, self.height))
 
         print(f"INFO: fps: {self.fps}, height:{self.height}, width:{self.width}")
-
-    @property
-    def traffic_lights_repository(self):
-        return self._traffic_lights_repository
 
     @property
     def principal_point(self) -> Coordinates:
@@ -106,13 +100,7 @@ class Info:
         return image
 
     def draw_corridors(self, image) -> np.ndarray:
-        corridor_mask = self.corridors_repository.get_mask()
-        inverse_corridor_mask = cv2.bitwise_not(corridor_mask)
-
-        # removing area from image
-        image = cv2.bitwise_and(image, image, inverse_corridor_mask)
-
-        # add corridors to image
+        corridor_mask = self.corridors_repository.get_mask(fill=False)
         return cv2.add(image, corridor_mask)
 
     def vp1_preset_points(self) -> ([(int, int)]):

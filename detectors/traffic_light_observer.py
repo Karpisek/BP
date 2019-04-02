@@ -3,6 +3,9 @@ from enum import Enum
 import cv2
 import numpy as np
 
+import params
+from pipeline import ThreadedPipeBlock, is_frequency
+
 
 class Color(Enum):
     RED = 0
@@ -11,15 +14,30 @@ class Color(Enum):
     GREEN = 3
 
 
-class TrafficLightsRepository:
+class TrafficLightsObserver(ThreadedPipeBlock):
+
     colors = [Color.RED_ORANGE, Color.RED, Color.ORANGE, Color.GREEN]
 
-    def __init__(self, info):
+    def __init__(self, info, output, tweak_roi=None):
+        super().__init__(output=output, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+
         self._traffic_lights = []
         self._info = info
 
         self._current_status = np.array([1, 1, 1, 1])
         self._next_status = np.array([0, 0, 0, 0])
+
+        if tweak_roi is not None:
+            self.new_traffic_light(*tweak_roi)
+
+    def _step(self, seq):
+        loader_seq, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+
+        if is_frequency(seq, params.OBSERVER_FREQUENCY):
+            new_status = self.status(image=new_frame)
+
+            message = seq, new_status
+            self.send(message, pipe_id=params.OBSERVER_ID)
 
     def new_traffic_light(self, x, y, width, height):
         top_left = x, y
@@ -31,6 +49,9 @@ class TrafficLightsRepository:
         self._traffic_lights.append(new_traffic_light)
 
     def status(self, image):
+        if len(self._traffic_lights) == 0:
+            return None
+
         new_status = self._traffic_lights[0].state(image)
         new_status *= self._current_status
 
@@ -44,8 +65,8 @@ class TrafficLightsRepository:
             self._current_status = np.array([1, 1, 1, 1])
             self._current_status[index] = 0
 
-            print(TrafficLightsRepository.colors[int(index)])
-            return TrafficLightsRepository.colors[int(index)]
+            print(TrafficLightsObserver.colors[int(index)])
+            return TrafficLightsObserver.colors[int(index)]
         return None
 
 

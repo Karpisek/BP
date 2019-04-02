@@ -33,21 +33,21 @@ class Area:
         if not self.defined:
             return False
 
-        if not self._info.corridors_repository.ready:
-            if coordinates.x < self._top_left.x:
-                return False
+        # if not self._info.corridors_repository.ready:
+        if coordinates.x < self._top_left.x:
+            return False
 
-            if coordinates.y < self._top_left.y:
-                return False
+        if coordinates.y < self._top_left.y:
+            return False
 
-            if coordinates.x > self._bot_right.x:
-                return False
+        if coordinates.x > self._bot_right.x:
+            return False
 
-            if coordinates.y > self._bot_right.y:
-                return False
+        if coordinates.y > self._bot_right.y:
+            return False
 
-        else:
-            return self._info.corridors_repository.get_corridor(coordinates=coordinates)
+        # else:
+        #     return self._info.corridors_repository.get_corridor(coordinates=coordinates)
 
         return True
 

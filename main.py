@@ -8,7 +8,7 @@ from pipeline.observer import Observer
 from pipeline.traffic_lights_finder import TrafficLightsFinder
 from video_stream import FrameLoader, Info, VideoPlayer
 from pipeline import Tracker, Calibrator
-from detectors import Detector
+from detectors import Detector, TrafficLightsObserver
 
 # VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00002.MTS"
@@ -21,8 +21,8 @@ from detectors import Detector
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2b.mp4"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
-VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
 
 PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/small_longer.pb'
@@ -37,9 +37,22 @@ video_player = VideoPlayer(info=video_info)
 calibrator = Calibrator(info=video_info,
                         output=[video_player])
 
+# TODO!!! tweak
+
+tape = cv2.VideoCapture(VIDEO_PATH)
+_, image = tape.read()
+roi_light = cv2.selectROI("image", image)
+cv2.destroyAllWindows()
+tape.release()
+
 # observer
 observer = Observer(info=video_info,
                     output=[video_player])
+
+# traffic light observer
+traffic_lights_observer = TrafficLightsObserver(info=video_player,
+                                                output=[observer],
+                                                tweak_roi=roi_light)
 
 # car tracker
 tracker = Tracker(info=video_info,
@@ -64,7 +77,7 @@ light_detector = Detector(model=PATH_TO_LIGHTS_MODEL,
 
 # frame loader
 frame_loader = FrameLoader(info=video_info,
-                           output=[car_detector, light_detector, video_player, tracker, calibrator])
+                           output=[car_detector, light_detector, video_player, tracker, calibrator, traffic_lights_observer])
 
 
 frame_loader.start()
@@ -74,6 +87,7 @@ tracker.start()
 calibrator.start()
 traffic_lights_finder.start()
 observer.start()
+traffic_lights_observer.start()
 
 video_player._loader = frame_loader
 video_player._detector = car_detector

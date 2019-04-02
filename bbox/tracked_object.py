@@ -103,7 +103,6 @@ class TrackedObjectsRepository:
 
         for tracked_object in self._tracked_objects:
             if not self._info.update_area.contains(tracked_object.center):
-
                 if tracked_object.lifetime > 0:
                     if tracked_object.history.y > tracked_object.center.y:
                         self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
@@ -148,13 +147,11 @@ class TrackedObject:
 
                 try:
                     l = Line(p1, p2)
-                    print(l)
                     l.draw(mask, color, thickness)
                     image = cv2.add(image, mask)
                 except SamePointError:
                     continue
                 except NotOnLineError:
-                    print(p1, p2)
                     raise
 
         return image
@@ -249,18 +246,32 @@ class TrackedObject:
         return int(np.abs(self._kalman.statePost[2][0])), int(np.abs(self._kalman.statePost[3][0]))
 
     @property
-    def left_anchor(self) -> (int, int):
-        x_min = int((self.center.x - self.size.width / 2))
-        y_min = int((self.center.y - self.size.height / 2))
+    def left_top_anchor(self) -> Coordinates:
+        x = int((self.center.x - self.size.width / 2))
+        y = int((self.center.y - self.size.height / 2))
 
-        return x_min, y_min
+        return Coordinates(x, y)
 
     @property
-    def right_anchor(self) -> (int, int):
-        x_max = int((self.center.x + self.size.width / 2))
-        y_max = int((self.center.y + self.size.height / 2))
+    def left_bot_anchor(self) -> Coordinates:
+        x = int((self.center.x - self.size.width / 2))
+        y = int((self.center.y + self.size.height / 2))
 
-        return x_max, y_max
+        return Coordinates(x, y)
+
+    @property
+    def right_top_anchor(self) -> Coordinates:
+        x = int((self.center.x + self.size.width / 2))
+        y = int((self.center.y - self.size.height / 2))
+
+        return Coordinates(x, y)
+
+    @property
+    def right_bot_anchor(self) -> Coordinates:
+        x = int((self.center.x + self.size.width / 2))
+        y = int((self.center.y + self.size.height / 2))
+
+        return Coordinates(x, y)
 
     @property
     def car_info(self) -> str:
@@ -284,7 +295,7 @@ class TrackedObject:
             return 0
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
-        return self.left_anchor, self.right_anchor, self.center.tuple()
+        return self.left_top_anchor.tuple(), self.right_bot_anchor.tuple(), self.center.tuple()
 
     def predict(self) -> ((float, float), (float, float)) or None:
         self._kalman.predict()

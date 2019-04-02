@@ -20,6 +20,8 @@ class Calibrator(ThreadedPipeBlock):
         self._pc_lines = PcLines(info.width)
         self._info = info
 
+        # self._info.vanishing_points.append(VanishingPoint((548, -86)))
+
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
         seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
@@ -64,12 +66,14 @@ class Calibrator(ThreadedPipeBlock):
 
         vp1 = self._info.vanishing_points[0]
         if lines is not None:
+            detected_point_pairs = []
+
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
                 point2 = x2, y2
 
                 try:
-                    if vp1.coordinates.distance(Coordinates(x1, y1)) > vp1.coordinates.distance(Coordinates(x2, y2)):
+                    if Coordinates(*vp1.point).distance(Coordinates(x1, y1)) > Coordinates(*vp1.point).distance(Coordinates(x2, y2)):
                         line_to_vp = Line(point1, vp1.point)
                     else:
                         line_to_vp = Line(point2, vp1.point)
@@ -78,17 +82,23 @@ class Calibrator(ThreadedPipeBlock):
                         cv2.line(selected_areas, point1, point2, params.COLOR_WHITE, 1)
                         continue
 
-                    self._pc_lines.pc_line_from_points(point1, point2)
+                    detected_point_pairs.append((Coordinates(*point1), Coordinates(*point2)))
+                    # self._pc_lines.pc_line_from_points(point1, point2)
                     cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
+
+            detected_point_pairs.sort(key=lambda point_pair: point_pair[0].distance(point_pair[1]),
+                                      reverse=True)
+
+            for pair in detected_point_pairs[:params.CALIBRATOR_VP2_TRACK_MAX_PER_RUN]:
+                coordinates1, coordinates2 = pair
+                self._pc_lines.pc_line_from_points(coordinates1.tuple(), coordinates2.tuple())
 
         if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_line_cross(only_preset=False)
             self._info.vanishing_points.append(new_vanishing_point)
             self._pc_lines.clear()
-
-        cv2.imwrite("test.jpg", selected_areas)
 
     def calculate_third_vp(self):
         vp1 = self._info.vanishing_points[0].point
