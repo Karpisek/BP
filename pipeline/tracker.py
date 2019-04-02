@@ -53,6 +53,11 @@ class Tracker(ThreadedPipeBlock):
 
             message = sequence_number, outer_masks, outer_masks_no_border, lifelines
 
+        elif target == params.OBSERVER_ID:
+            serialized_tracked_objects = self._tracked_object_repository.serialize()
+
+            message = sequence_number, serialized_tracked_objects
+
         if message is not None:
             self.send(message, pipe_id=target, block=block)
 
@@ -80,15 +85,19 @@ class Tracker(ThreadedPipeBlock):
             _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
 
-        if is_frequency(sequence_number, params.VIDEO_PLAYER_FREQUENCY):
-            self._send_message(target=params.VIDEO_PLAYER_ID,
-                               sequence_number=sequence_number)
+        # if is_frequency(sequence_number, params.VIDEO_PLAYER_FREQUENCY):
+        #     self._send_message(target=params.VIDEO_PLAYER_ID,
+        #                        sequence_number=sequence_number)
 
         if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
 
             self._send_message(target=params.CALIBRATOR_ID,
                                sequence_number=sequence_number,
                                block=False)
+
+        if is_frequency(sequence_number, params.OBSERVER_FREQUENCY):
+            self._send_message(target=params.OBSERVER_ID,
+                               sequence_number=sequence_number)
 
     def _hungarian_method(self, detected_boxes) -> None:
 

@@ -148,6 +148,7 @@ class TrackedObject:
 
                 try:
                     l = Line(p1, p2)
+                    print(l)
                     l.draw(mask, color, thickness)
                     image = cv2.add(image, mask)
                 except SamePointError:

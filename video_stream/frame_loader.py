@@ -34,6 +34,9 @@ class FrameLoader(ThreadedPipeBlock):
         seq += 1
         status, image = self._info.input.read()
 
+        for _ in range(int(self._info.fps / 20)):
+            status, image = self._info.input.read()
+
         if status is False:
             return
 

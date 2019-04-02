@@ -137,7 +137,7 @@ class Line:
             return x, ((-self.a) * x - self.c) / self.b
         else:
             if self.a == 0:
-                return x, -self.c/self.b
+                return y, -self.c/self.b
             return ((-self.b) * y - self.c) / self.a, y
 
     def draw(self, image, color, thickness) -> None:

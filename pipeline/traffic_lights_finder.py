@@ -19,50 +19,52 @@ class TrafficLightsFinder(ThreadedPipeBlock):
         self._info = info
 
     def _step(self, seq):
-        detected_objects = self.receive(pipe_id=params.DETECTOR_LIGHT_ID)
+        time.sleep(5)
+        # detected_objects = self.receive(pipe_id=params.DETECTOR_LIGHT_ID)
 
-        for detected_object in detected_objects:
-            self._draw_detected_object(*detected_object)
+        # for detected_object in detected_objects:
+        #     self._draw_detected_object(*detected_object)
 
-        if np.amax(self._finder_mask) == 255:
-            all_finder_mask = np.copy(self._finder_mask)
-            all_finder_mask[all_finder_mask > 0] = 255
-            all_finder_mask = cv2.bitwise_not(all_finder_mask)
+        # if np.amax(self._finder_mask) == 255:
+        #     all_finder_mask = np.copy(self._finder_mask)
+        #     all_finder_mask[all_finder_mask > 0] = 255
+        #     all_finder_mask = cv2.bitwise_not(all_finder_mask)
+        #
+        #     self._finder_mask[self._finder_mask < 200] = 0
+        #
+        #     contours, hierarchy = cv2.findContours(self._finder_mask, 1, 2)
+        #
+        #     seed_points = []
+        #     for contour in contours:
+        #         rect = cv2.minAreaRect(contour)
+        #         x, y = rect[0]
+        #         w, h = rect[1]
+        #
+        #         center = int(x + w/2), int(y + h/2)
+        #         print(center)
+        #         seed_points.append(center)
+        #
+        #     tabula_rasa = np.zeros_like(all_finder_mask)
+        #     all_finder_mask = np.pad(all_finder_mask, 1, 'constant', constant_values=255)
+        #
+        #     for point in seed_points:
+        #         cv2.floodFill(image=tabula_rasa,
+        #                       mask=all_finder_mask,
+        #                       seedPoint=point,
+        #                       newVal=50)
+        #
+        #     print("ahoj")
+        #     cv2.imwrite(f"10.jpg", tabula_rasa)
+        #
+        #
+        #
+        #
+        #
+        #
+        #     cv2.imwrite(f"2.jpg", self._finder_mask)
 
-            self._finder_mask[self._finder_mask < 200] = 0
-
-            contours, hierarchy = cv2.findContours(self._finder_mask, 1, 2)
-
-            seed_points = []
-            for contour in contours:
-                rect = cv2.minAreaRect(contour)
-                x, y = rect[0]
-                w, h = rect[1]
-
-                center = int(x + w/2), int(y + h/2)
-                print(center)
-                seed_points.append(center)
-
-            tabula_rasa = np.zeros_like(all_finder_mask)
-            all_finder_mask = np.pad(all_finder_mask, 1, 'constant', constant_values=255)
-
-            for point in seed_points:
-                cv2.floodFill(image=tabula_rasa,
-                              mask=all_finder_mask,
-                              seedPoint=point,
-                              newVal=50)
-
-            print("ahoj")
-            cv2.imwrite(f"10.jpg", tabula_rasa)
-
-
-
-
-
-
-            cv2.imwrite(f"2.jpg", self._finder_mask)
-
-            exit()
+            # exit()
+        pass
 
     def _draw_detected_object(self, coordinates, size, confident_score) -> None:
         print(confident_score)

@@ -11,6 +11,7 @@ class TrafficCorridorRepository:
         self._corridors = {}
         self._corridors_count = 0
         self._corridor_mask = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
+        self._stop_line = None
 
     @property
     def ready(self):
@@ -112,6 +113,9 @@ class TrafficCorridorRepository:
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
         self._ready = True
+
+    def create_stop_line(self):
+        raise NotImplementedError
 
 
 class TrafficCorridor:

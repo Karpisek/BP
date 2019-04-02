@@ -21,7 +21,7 @@ class Info:
         self.track_boxes = True
 
         self._corridors_repository = TrafficCorridorRepository(self)
-        # self._traffic_lights_repository = TrafficLightsRepository()
+        self._traffic_lights_repository = TrafficLightsRepository(self)
 
         self._tracker_start_area = Area(info=self,
                                         top_left=Coordinates(0, self.height/3),
@@ -30,6 +30,12 @@ class Info:
         self._tracker_update_area = Area(info=self,
                                          top_left=Coordinates(0, self.height/4),
                                          bottom_right=Coordinates(self.width, self.height))
+
+        print(f"INFO: fps: {self.fps}, height:{self.height}, width:{self.width}")
+
+    @property
+    def traffic_lights_repository(self):
+        return self._traffic_lights_repository
 
     @property
     def principal_point(self) -> Coordinates:
