@@ -24,6 +24,8 @@ class FrameLoader(ThreadedPipeBlock):
         self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
                                                               varThreshold=params.FRAME_LOADER_THRESHOLD)
 
+        self._uncalibrated_phase = True
+
     def _step(self, seq):
         """
         runs until are images in input stream
@@ -31,7 +33,10 @@ class FrameLoader(ThreadedPipeBlock):
         :return: none
         """
 
-        seq += 1
+        if self._uncalibrated_phase and self._info.calibrated:
+            self._info.reopen()
+            self._uncalibrated_phase = False
+
         status, image = self._info.input.read()
 
         for _ in range(int(self._info.fps / 20)):

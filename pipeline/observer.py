@@ -92,5 +92,5 @@ class Observer(ThreadedPipeBlock):
                         self._info.corridors_repository.add_stop_point(first_box.tracker_point)
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
-            message = seq, boxes
+            message = seq, boxes, self._current_lights_status
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)

@@ -3,6 +3,7 @@ import numpy as np
 
 import params
 from bbox import Area, Coordinates
+from detectors import Color
 from pc_lines import TrafficCorridorRepository
 
 
@@ -13,6 +14,9 @@ class Info:
         self._fps = self.input.get(cv2.CAP_PROP_FPS)
         self._height = self.input.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self._width = self.input.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self._frame_count = self.input.get(cv2.CAP_PROP_FRAME_COUNT)
+
+        self._path = path
 
         self._vanishing_points = []
         self._traffic_lights = []
@@ -29,7 +33,15 @@ class Info:
                                          top_left=Coordinates(0, self.height/4),
                                          bottom_right=Coordinates(self.width, self.height))
 
-        print(f"INFO: fps: {self.fps}, height:{self.height}, width:{self.width}")
+        print(f"INFO: fps: {self.fps}, height: {self.height}, width: {self.width}, frame count: {self.frame_count}")
+
+    @property
+    def frame_count(self):
+        return self._frame_count
+
+    @property
+    def calibrated(self):
+        return self._corridors_repository.ready
 
     @property
     def principal_point(self) -> Coordinates:
@@ -75,8 +87,8 @@ class Info:
     def corridors_repository(self):
         return self._corridors_repository
 
-    def calibrated(self) -> bool:
-        return len(self.vanishing_points) > 1
+    def reopen(self):
+        self.input.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def draw_vanishing_points(self, image) -> None:
 
@@ -102,6 +114,44 @@ class Info:
     def draw_corridors(self, image) -> np.ndarray:
         corridor_mask = self.corridors_repository.get_mask(fill=False)
         return cv2.add(image, corridor_mask)
+
+    def draw(self, image, lights_status):
+        color1 = params.COLOR_GRAY
+        color2 = params.COLOR_GRAY
+        color3 = params.COLOR_GRAY
+
+        if lights_status == Color.RED or lights_status == Color.RED_ORANGE:
+            color1 = params.COLOR_RED
+
+        if lights_status == Color.ORANGE or lights_status == Color.RED_ORANGE:
+            color2 = params.COLOR_ORANGE
+
+        if lights_status == Color.GREEN:
+            color3 = params.COLOR_GREEN
+
+        cv2.rectangle(img=image,
+                      pt1=(10, 10),
+                      pt2=(30, 70),
+                      color=params.COLOR_BLACK,
+                      thickness=params.FILL)
+
+        cv2.circle(img=image,
+                   center=(20, 20),
+                   radius=5,
+                   color=color1,
+                   thickness=params.FILL)
+
+        cv2.circle(img=image,
+                   center=(20, 40),
+                   radius=5,
+                   color=color2,
+                   thickness=params.FILL)
+
+        cv2.circle(img=image,
+                   center=(20, 60),
+                   radius=5,
+                   color=color3,
+                   thickness=params.FILL)
 
     def vp1_preset_points(self) -> ([(int, int)]):
         points = []

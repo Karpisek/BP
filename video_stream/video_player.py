@@ -28,22 +28,16 @@ class VideoPlayer(PipeBlock):
         frame_counter += 1
 
         while True:
-            observer_seq, boxes = self.receive(pipe_id=params.OBSERVER_ID)
+            observer_seq, boxes, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
 
             [box.draw(image) for box in boxes]
 
             # self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
+            self._info.draw(image_with_corridors, lights_state)
 
-            image_calibrator = None
-            if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
-                image_calibrator = self.receive(pipe_id=params.CALIBRATOR_ID, block=False)
-
-            if image_calibrator is not None:
-                cv2.imshow("image", image_calibrator)
-            else:
-                cv2.imshow("image", image_with_corridors)
+            cv2.imshow("image", image_with_corridors)
 
             key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
@@ -60,11 +54,10 @@ class VideoPlayer(PipeBlock):
                 frame_counter = 0
                 clock = time.time()
 
+            if seq == self._info.frame_count:
+                break
+
             seq, image = self.receive(params.FRAME_LOADER_ID)
             frame_counter += 1
 
         cv2.destroyAllWindows()
-
-
-
-
