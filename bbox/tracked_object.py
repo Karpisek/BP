@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from munkres import Munkres
 
 import params
 from bbox.coordinates import Coordinates

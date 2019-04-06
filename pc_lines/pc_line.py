@@ -2,9 +2,13 @@ import cv2
 import numpy as np
 from matplotlib import pyplot
 
-from pc_lines.vanishing_point import VanishingPoint
-from .line import Line, NoIntersectionError, SamePointError
+from bbox import Coordinates
+from .line import Line, NoIntersectionError, SamePointError, ransac
 import params
+
+
+class ParametersNotDefinedError(Exception):
+    pass
 
 
 class PcLines:
@@ -52,45 +56,26 @@ class PcLines:
         self.s_space = []
         print(self.t_points, self.s_points)
 
-    def find_most_line_cross(self, preset_points: [Line] = None, only_preset: bool = True) -> VanishingPoint:
+    def find_most_lines_cross(self) -> Coordinates:
 
         pyplot.xlim((-2 * self.delta, 2 * self.delta))
         pyplot.ylim((-2 * self.delta, 2 * self.delta))
 
-        preset_ratio = 0
-        ratio = 0
-        line = None
-        preset_line = None
-
-        if preset_points is not None:
-            print("1")
-            preset_line, preset_ratio = self.ransac_from_preset(preset_pc_points=preset_points)
-
-        if not only_preset:
-            print("2")
-            line, ratio = self.ransac()
-
-        if preset_ratio > ratio:
-            ratio = preset_ratio
-            line = preset_line
-
-        print("3")
+        line, ratio = ransac(creator_points=self.s_points,
+                             voting_points=self.s_points,
+                             ransac_threshold=params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta)
 
         u1, v1 = line.find_coordinate(x=0)
         u2, v2 = line.find_coordinate(x=self.delta)
 
-        vp = VanishingPoint(point=(v1, v2))
-
         pyplot.plot([*line.find_coordinate(x=-2 * self.delta)], [*line.find_coordinate(x=2 * self.delta)])
-        # pyplot.plot([-self.delta, 0], [-y, x])
-
         self.plot()
-        pyplot.show()
-        print(ratio)
-        print(vp)
-        # self.debug_spaces_print(line)
 
-        return vp
+        pyplot.show()
+
+        print("ratio:", ratio)
+
+        return Coordinates(x=v1, y=v2)
 
     def pc_points(self, points=None, angles=None) -> [Line]:
         created_lines = []
@@ -149,34 +134,14 @@ class PcLines:
 
         return best_line, best_line_ratio
 
-    def ransac(self):
+    def add_to_pc_space(self, point1=None, point2=None, line=None):
 
-        best_line_ratio = 0
-        best_line = None
+        if line is not None:
+            point1 = line.find_coordinate(x=0)
+            point2 = line.find_coordinate(x=1000)
+        elif point1 is None and point2 is None:
+            raise ParametersNotDefinedError
 
-        for point1 in self.s_points:
-            for point2 in self.s_points:
-                try:
-                    line = Line(point1, point2)
-                except SamePointError:
-                    continue
-
-                num = 0
-                ransac_threshold = self.delta * params.CALIBRATOR_RANSAC_THRESHOLD_RATIO
-                for point in self.s_points:
-                    distance = line.point_distance(point)
-
-                    if distance < ransac_threshold:
-                        num += 1
-
-                # self.debug_spaces_print(line)
-                if num > best_line_ratio:
-                    best_line_ratio = num
-                    best_line = line
-
-        return best_line, best_line_ratio
-
-    def pc_line_from_points(self, point1, point2):
         x1, y1 = point1
         x2, y2 = point2
 

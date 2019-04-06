@@ -14,6 +14,36 @@ class NotOnLineError(Exception):
     pass
 
 
+def ransac(creator_points, voting_points, ransac_threshold):
+    best_line_ratio = 0
+    best_line = None
+
+    print(len(creator_points))
+    print(len(voting_points))
+    print("threshold: ", ransac_threshold)
+
+    for point1 in creator_points:
+        for point2 in creator_points:
+            try:
+                line = Line(point1, point2)
+            except SamePointError:
+                continue
+
+            accepted_points = 0
+            for point in voting_points:
+                distance = line.point_distance(point)
+
+                if distance < ransac_threshold:
+                    accepted_points += 1
+
+            # self.debug_spaces_print(line)
+            if accepted_points > best_line_ratio:
+                best_line_ratio = accepted_points
+                best_line = line
+
+    return best_line, best_line_ratio
+
+
 class Line:
     def __init__(self, point1, point2=None, direction=None):
 

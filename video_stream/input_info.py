@@ -91,10 +91,6 @@ class Info:
         self.input.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def draw_vanishing_points(self, image) -> None:
-
-        if not self.calibrated:
-            return
-
         points = [(0, int(self.height)),
                   (1 * int(self.width / 4), int(3 * self.height / 4)),
                   (2 * int(self.width / 4), int(3 * self.height / 4)),

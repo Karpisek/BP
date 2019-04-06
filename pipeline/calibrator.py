@@ -1,5 +1,4 @@
-from bbox import TrackedObject, Coordinates
-from pc_lines.line import SamePointError, Line
+from pc_lines.line import Line
 from pc_lines.pc_line import PcLines
 from pc_lines.vanishing_point import VanishingPoint
 from pipeline import ThreadedPipeBlock
@@ -20,107 +19,123 @@ class Calibrator(ThreadedPipeBlock):
         self._pc_lines = PcLines(info.width)
         self._info = info
 
-        # self._info.vanishing_points.append(VanishingPoint((548, -86)))
+        self.parts = [[] for _ in range(params.CALIBRATOR_HORIZONTAL_PARTS)]
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
         if len(self._info.vanishing_points) < 1:
-            self.detect_first_vp(lifelines)
+            self.detect_first_vp(new_frame)
 
-        elif len(self._info.vanishing_points) < 2:
-            self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+        # elif len(self._info.vanishing_points) < 2:
+        #     self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+        #
+        # else:
+        #     self.calculate_third_vp()
+        #     self.find_corridors(lifelines)
+        #     exit()
 
-        else:
-            self.calculate_third_vp()
-            self.find_corridors(lifelines)
-            exit()
+    def detect_first_vp(self, new_frame: np.ndarray):
+        blured_frame = cv2.blur(src=new_frame,
+                                ksize=params.CALIBRATOR_BLUR_KERNEL)
 
-    def detect_first_vp(self, lifelines):
-        if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
+        median_blured_image = cv2.medianBlur(src=blured_frame,
+                                             ksize=params.CALIBRATOR_MEDIAN_BLUR_KERNEL_SIZE)
 
-            for lifeline in lifelines:
-                old_position, new_position = lifeline
-                self._pc_lines.pc_line_from_points(tuple(old_position), tuple(new_position))
+        vertical_offset = int(self._info.height * params.CALIBRATOR_FOCUS_AREA_COEFFICIENT)
 
-            preset_pc_points = self._pc_lines.pc_points(points=self._info.vp1_preset_points())
+        area_of_focus = median_blured_image[vertical_offset:, :]
+        extracted_edges = cv2.Canny(image=area_of_focus,
+                                    threshold1=50,
+                                    threshold2=200)
 
-            new_vanishing_point = self._pc_lines.find_most_line_cross(preset_points=preset_pc_points)
-            self._info.vanishing_points.append(new_vanishing_point)
-            self._pc_lines.clear()
+        dilate_edges = cv2.dilate(src=extracted_edges,
+                                  kernel=params.CALIBRATOR_DILATATION_KERNEL,
+                                  iterations=5)
 
-    def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border) -> None:
+        part_width = int(self._info.width/params.CALIBRATOR_HORIZONTAL_PARTS)
 
-        selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
-        blured = cv2.blur(selected_areas, (3, 3))
+        detected_lines = cv2.HoughLinesP(image=dilate_edges,
+                                         rho=1,
+                                         theta=np.pi / 180,
+                                         threshold=20,
+                                         minLineLength=params.CALIBRATOR_HOUGH_MINIMAL_LINE_LENGTH,
+                                         maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
 
-        canny = cv2.Canny(blured, 50, 150, apertureSize=3)
-        no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
-        lines = cv2.HoughLinesP(image=no_border_canny,
-                                rho=1,
-                                theta=np.pi / 350,
-                                threshold=params.CALIBRATOR_HLP_THRESHOLD,
-                                minLineLength=params.CALIBRATOR_MIN_LINE_LENGTH,
-                                maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
+        if detected_lines is not None:
+            best_lines = [[] for _ in range(params.CALIBRATOR_HORIZONTAL_PARTS)]
+            horizontal_line = Line(point1=(0, 0),
+                                   point2=(10, 0))
 
-        vp1 = self._info.vanishing_points[0]
-        if lines is not None:
-            detected_point_pairs = []
+            for line in detected_lines:
+                x1, y1, x2, y2 = line[0]
 
-            for (x1, y1, x2, y2), in lines:
-                point1 = x1, y1
-                point2 = x2, y2
+                y1 += vertical_offset
+                y2 += vertical_offset
 
-                try:
-                    if Coordinates(*vp1.point).distance(Coordinates(x1, y1)) > Coordinates(*vp1.point).distance(Coordinates(x2, y2)):
-                        line_to_vp = Line(point1, vp1.point)
-                    else:
-                        line_to_vp = Line(point2, vp1.point)
+                new_line = Line(point1=(x1, y1),
+                                point2=(x2, y2))
 
-                    if Line(point1, point2).angle(line_to_vp) < 30 or Line(point1, point2).angle(line_to_vp) > 150:
-                        cv2.line(selected_areas, point1, point2, params.COLOR_WHITE, 1)
-                        continue
+                base_intersection = new_line.find_coordinate(y=self._info.height)
 
-                    detected_point_pairs.append((Coordinates(*point1), Coordinates(*point2)))
-                    # self._pc_lines.pc_line_from_points(point1, point2)
-                    cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
-                except SamePointError:
+                if base_intersection[0] < self._info.width/3:
+                    section_index = 0
+                elif base_intersection[0] > 2*self._info.width/3:
+                    section_index = 1
+                else:
                     continue
 
-            detected_point_pairs.sort(key=lambda point_pair: point_pair[0].distance(point_pair[1]),
-                                      reverse=True)
+                if new_line.angle(horizontal_line) > 30:
+                    best_lines[section_index].append(new_line)
 
-            for pair in detected_point_pairs[:params.CALIBRATOR_VP2_TRACK_MAX_PER_RUN]:
-                coordinates1, coordinates2 = pair
-                self._pc_lines.pc_line_from_points(coordinates1.tuple(), coordinates2.tuple())
+            for index, section in enumerate(best_lines):
+                if len(section):
+                    best_line_in_section = sorted(section, key=lambda x: x.magnitude, reverse=True)[0]
+                    self.parts[index].append(best_line_in_section)
 
-        if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
-            new_vanishing_point = self._pc_lines.find_most_line_cross(only_preset=False)
-            self._info.vanishing_points.append(new_vanishing_point)
-            self._pc_lines.clear()
+        minimal_line_count = np.inf
+        print(":::::")
+        for part in self.parts:
+            if len(part) < minimal_line_count:
+                minimal_line_count = len(part)
+            print(len(part))
 
-    def calculate_third_vp(self):
-        vp1 = self._info.vanishing_points[0].point
-        vp2 = self._info.vanishing_points[1].point
+        if minimal_line_count > params.CALIBRATOR_VP1_MINIMUM:
+            for section in self.parts:
+                section.sort(key=lambda x: x.magnitude, reverse=True)
 
-        vp1_to_vp2 = Line(vp1, vp2)
-        # normal = vp1_to_vp2.direction
+            intersection = self.parts[0][0].intersection(self.parts[1][0])
 
-        # vp1_to_principal = Line(vp1, self._info.principal_point.tuple())
-        # vp2_to_principal = Line(vp2, self._info.principal_point.tuple())
-        #
-        # vp2_to_vp3 = Line(vp2, direction=vp1_to_principal.normal_direction())
-        # vp1_to_vp3 = Line(vp1, direction=vp2_to_principal.normal_direction())
+            self.parts[0][0].draw(new_frame, params.COLOR_RED, params.DEFAULT_THICKNESS)
+            self.parts[1][0].draw(new_frame, params.COLOR_RED, params.DEFAULT_THICKNESS)
 
-        self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
-        # print(vp3)
+            detected_vanishing_point = VanishingPoint(point=intersection)
+            cv2.imwrite("test.jpg", new_frame)
+            self._info.vanishing_points.append(detected_vanishing_point)
+            print(detected_vanishing_point)
+            exit()
 
-    def find_corridors(self, lifelines):
-        mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
-        mask = TrackedObject.draw_lifelines(image=mask,
-                                            lifelines=lifelines,
-                                            color=params.COLOR_LIFELINE,
-                                            thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
-
-        self._info.corridors_repository.find_corridors(mask)
+    # def calculate_third_vp(self):
+    #     vp1 = self._info.vanishing_points[0].point
+    #     vp2 = self._info.vanishing_points[1].point
+    #
+    #     vp1_to_vp2 = Line(vp1, vp2)
+    #     # normal = vp1_to_vp2.direction
+    #
+    #     # vp1_to_principal = Line(vp1, self._info.principal_point.tuple())
+    #     # vp2_to_principal = Line(vp2, self._info.principal_point.tuple())
+    #     #
+    #     # vp2_to_vp3 = Line(vp2, direction=vp1_to_principal.normal_direction())
+    #     # vp1_to_vp3 = Line(vp1, direction=vp2_to_principal.normal_direction())
+    #
+    #     self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
+    #     # print(vp3)
+    #
+    # def find_corridors(self, lifelines):
+    #     mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
+    #     mask = TrackedObject.draw_lifelines(image=mask,
+    #                                         lifelines=lifelines,
+    #                                         color=params.COLOR_LIFELINE,
+    #                                         thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
+    #
+    #     self._info.corridors_repository.find_corridors(mask)

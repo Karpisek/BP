@@ -13,7 +13,7 @@ def transpose_matrix(matrix):
 
 class Tracker(ThreadedPipeBlock):
 
-    def __init__(self, info, calibrator, output=None):
+    def __init__(self, info, output=None):
         super().__init__(pipe_id=params.TRACKER_ID, output=output)
 
         self.new_positions = []
@@ -21,8 +21,6 @@ class Tracker(ThreadedPipeBlock):
 
         self._info = info
         self._points_to_track = None
-
-        self._calibrator = calibrator
 
         self._tracked_object_repository = TrackedObjectsRepository(info)
         self._optical_flow = OpticalFlow(info, self._tracked_object_repository)
@@ -45,13 +43,6 @@ class Tracker(ThreadedPipeBlock):
             serialized_tracked_objects = self._tracked_object_repository.serialize()
             tracked_object_lifelines = self._tracked_object_repository.lifelines
             message = sequence_number, serialized_tracked_objects, tracked_object_lifelines
-
-        elif target == params.CALIBRATOR_ID:
-            outer_masks = self._tracked_object_repository.all_boxes_mask(area_size="outer")
-            outer_masks_no_border = self._tracked_object_repository.all_boxes_mask(area_size="small-outer")
-            lifelines = self._tracked_object_repository.lifelines
-
-            message = sequence_number, outer_masks, outer_masks_no_border, lifelines
 
         elif target == params.OBSERVER_ID:
             serialized_tracked_objects = self._tracked_object_repository.serialize()
@@ -84,16 +75,6 @@ class Tracker(ThreadedPipeBlock):
         if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
             _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
-
-        # if is_frequency(sequence_number, params.VIDEO_PLAYER_FREQUENCY):
-        #     self._send_message(target=params.VIDEO_PLAYER_ID,
-        #                        sequence_number=sequence_number)
-
-        if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-
-            self._send_message(target=params.CALIBRATOR_ID,
-                               sequence_number=sequence_number,
-                               block=False)
 
         if is_frequency(sequence_number, params.OBSERVER_FREQUENCY):
             self._send_message(target=params.OBSERVER_ID,

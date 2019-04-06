@@ -1,14 +1,12 @@
-import time
-
-import cv2
-
-import params
-from bbox import Area
 from pipeline.observer import Observer
 from pipeline.traffic_lights_finder import TrafficLightsFinder
 from video_stream import FrameLoader, Info, VideoPlayer
 from pipeline import Tracker, Calibrator
 from detectors import Detector, TrafficLightsObserver
+
+import cv2
+import params
+
 
 # VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00002.MTS"
@@ -18,10 +16,10 @@ from detectors import Detector, TrafficLightsObserver
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1b.mp4"
-VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2b.mp4"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
 
@@ -55,8 +53,7 @@ traffic_lights_observer = TrafficLightsObserver(info=video_player,
 
 # car tracker
 tracker = Tracker(info=video_info,
-                  output=[calibrator, observer],
-                  calibrator=calibrator)
+                  output=[observer])
 
 # traffic lights finder
 traffic_lights_finder = TrafficLightsFinder(info=video_info)
@@ -76,7 +73,12 @@ light_detector = Detector(model=PATH_TO_LIGHTS_MODEL,
 
 # frame loader
 frame_loader = FrameLoader(info=video_info,
-                           output=[car_detector, light_detector, video_player, tracker, calibrator, traffic_lights_observer])
+                           output=[car_detector,
+                                   light_detector,
+                                   video_player,
+                                   tracker,
+                                   calibrator,
+                                   traffic_lights_observer])
 
 
 frame_loader.start()

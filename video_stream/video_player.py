@@ -2,10 +2,7 @@ import time
 import cv2
 import params
 
-from bbox import TrackedObject
 from pipeline import PipeBlock
-from pipeline.pipeline import is_frequency
-
 
 class VideoPlayer(PipeBlock):
     def __init__(self, info):
@@ -32,7 +29,7 @@ class VideoPlayer(PipeBlock):
 
             [box.draw(image) for box in boxes]
 
-            # self._info.draw_vanishing_points(image)
+            self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
             self._info.draw(image_with_corridors, lights_state)
