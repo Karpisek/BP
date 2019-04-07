@@ -19,13 +19,14 @@ class Calibrator(ThreadedPipeBlock):
         self._pc_lines = PcLines(info.width)
         self._info = info
 
-        self.parts = [[] for _ in range(params.CALIBRATOR_HORIZONTAL_PARTS)]
+        self._detected_lines = []
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
         if len(self._info.vanishing_points) < 1:
-            self.detect_first_vp(new_frame)
+            self.detect_first_vp(lifelines)
 
         # elif len(self._info.vanishing_points) < 2:
         #     self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
@@ -35,85 +36,87 @@ class Calibrator(ThreadedPipeBlock):
         #     self.find_corridors(lifelines)
         #     exit()
 
-    def detect_first_vp(self, new_frame: np.ndarray):
-        blured_frame = cv2.blur(src=new_frame,
-                                ksize=params.CALIBRATOR_BLUR_KERNEL)
+    def detect_first_vp(self, lifelines):
+        print(len(lifelines))
+        if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
 
-        median_blured_image = cv2.medianBlur(src=blured_frame,
-                                             ksize=params.CALIBRATOR_MEDIAN_BLUR_KERNEL_SIZE)
+            for lifeline in lifelines:
+                old_position, new_position = lifeline
+                self._pc_lines.add_to_pc_space(tuple(old_position), tuple(new_position))
 
-        vertical_offset = int(self._info.height * params.CALIBRATOR_FOCUS_AREA_COEFFICIENT)
+            new_vanishing_point = VanishingPoint(point=self._pc_lines.find_most_lines_cross())
+            self._info.vanishing_points.append(new_vanishing_point)
 
-        area_of_focus = median_blured_image[vertical_offset:, :]
-        extracted_edges = cv2.Canny(image=area_of_focus,
-                                    threshold1=50,
-                                    threshold2=200)
+        self._pc_lines.clear()
 
-        dilate_edges = cv2.dilate(src=extracted_edges,
-                                  kernel=params.CALIBRATOR_DILATATION_KERNEL,
-                                  iterations=5)
-
-        part_width = int(self._info.width/params.CALIBRATOR_HORIZONTAL_PARTS)
-
-        detected_lines = cv2.HoughLinesP(image=dilate_edges,
-                                         rho=1,
-                                         theta=np.pi / 180,
-                                         threshold=20,
-                                         minLineLength=params.CALIBRATOR_HOUGH_MINIMAL_LINE_LENGTH,
-                                         maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
-
-        if detected_lines is not None:
-            best_lines = [[] for _ in range(params.CALIBRATOR_HORIZONTAL_PARTS)]
-            horizontal_line = Line(point1=(0, 0),
-                                   point2=(10, 0))
-
-            for line in detected_lines:
-                x1, y1, x2, y2 = line[0]
-
-                y1 += vertical_offset
-                y2 += vertical_offset
-
-                new_line = Line(point1=(x1, y1),
-                                point2=(x2, y2))
-
-                base_intersection = new_line.find_coordinate(y=self._info.height)
-
-                if base_intersection[0] < self._info.width/3:
-                    section_index = 0
-                elif base_intersection[0] > 2*self._info.width/3:
-                    section_index = 1
-                else:
-                    continue
-
-                if new_line.angle(horizontal_line) > 30:
-                    best_lines[section_index].append(new_line)
-
-            for index, section in enumerate(best_lines):
-                if len(section):
-                    best_line_in_section = sorted(section, key=lambda x: x.magnitude, reverse=True)[0]
-                    self.parts[index].append(best_line_in_section)
-
-        minimal_line_count = np.inf
-        print(":::::")
-        for part in self.parts:
-            if len(part) < minimal_line_count:
-                minimal_line_count = len(part)
-            print(len(part))
-
-        if minimal_line_count > params.CALIBRATOR_VP1_MINIMUM:
-            for section in self.parts:
-                section.sort(key=lambda x: x.magnitude, reverse=True)
-
-            intersection = self.parts[0][0].intersection(self.parts[1][0])
-
-            self.parts[0][0].draw(new_frame, params.COLOR_RED, params.DEFAULT_THICKNESS)
-            self.parts[1][0].draw(new_frame, params.COLOR_RED, params.DEFAULT_THICKNESS)
-
-            detected_vanishing_point = VanishingPoint(point=intersection)
-            cv2.imwrite("test.jpg", new_frame)
-            self._info.vanishing_points.append(detected_vanishing_point)
-            print(detected_vanishing_point)
-            exit()
+    # def detect_first_vp(self, new_frame: np.ndarray):
+    #     blured_frame = cv2.blur(src=new_frame,
+    #                             ksize=params.CALIBRATOR_BLUR_KERNEL)
+    #
+    #     median_blured_image = cv2.medianBlur(src=blured_frame,
+    #                                          ksize=params.CALIBRATOR_MEDIAN_BLUR_KERNEL_SIZE)
+    #
+    #     vertical_offset = int(self._info.height * params.CALIBRATOR_FOCUS_AREA_COEFFICIENT)
+    #
+    #     area_of_focus = median_blured_image[vertical_offset:, :]
+    #     extracted_edges = cv2.Canny(image=area_of_focus,
+    #                                 threshold1=50,
+    #                                 threshold2=200)
+    #
+    #     dilate_edges = cv2.dilate(src=extracted_edges,
+    #                               kernel=params.CALIBRATOR_DILATATION_KERNEL,
+    #                               iterations=5)
+    #
+    #     detected_lines = cv2.HoughLinesP(image=dilate_edges,
+    #                                      rho=1,
+    #                                      theta=np.pi / 180,
+    #                                      threshold=20,
+    #                                      minLineLength=params.CALIBRATOR_HOUGH_MINIMAL_LINE_LENGTH,
+    #                                      maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
+    #
+    #     if detected_lines is not None:
+    #         best_line = None
+    #         horizontal_line = Line(point1=(0, 0),
+    #                                point2=(10, 0))
+    #
+    #         for line in detected_lines:
+    #             x1, y1, x2, y2 = line[0]
+    #
+    #             y1 += vertical_offset
+    #             y2 += vertical_offset
+    #
+    #             new_line = Line(point1=(x1, y1),
+    #                             point2=(x2, y2))
+    #
+    #             new_x_base = new_line.find_coordinate(y=self._info.height)[0]
+    #
+    #             if new_line.angle(horizontal_line) > 30:
+    #                 if best_line is None or new_line.magnitude > best_line.magnitude:
+    #                     no_collision = True
+    #
+    #                     for old_line in self._detected_lines:
+    #                         old_x_base = old_line.find_coordinate(y=self._info.height)[0]
+    #
+    #                         if abs(old_x_base - new_x_base) < params.CALIBRATOR_BASE_MIN_DISTANCE:
+    #                             no_collision = False
+    #
+    #                     if no_collision:
+    #                         best_line = new_line
+    #
+    #         if best_line is not None:
+    #             self._detected_lines.append(best_line)
+    #
+    #     print(len(self._detected_lines))
+    #     if len(self._detected_lines) > params.CALIBRATOR_VP1_MINIMUM:
+    #         for line in self._detected_lines:
+    #             self._pc_lines.add_to_pc_space(line=line)
+    #             line.draw(new_frame, params.COLOR_RED, params.DEFAULT_THICKNESS)
+    #
+    #         detected_vanishing_point = VanishingPoint(point=self._pc_lines.find_most_lines_cross(preset=self._info.vp1_preset_points()))
+    #         cv2.imwrite("test.jpg", new_frame)
+    #         self._info.vanishing_points.append(detected_vanishing_point)
+    #         print(detected_vanishing_point)
+    #         exit()
 
     # def calculate_third_vp(self):
     #     vp1 = self._info.vanishing_points[0].point

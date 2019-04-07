@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from matplotlib import pyplot
 
-from bbox import Coordinates
 from .line import Line, NoIntersectionError, SamePointError, ransac
 import params
 
@@ -54,9 +53,8 @@ class PcLines:
     def clear(self) -> None:
         self.t_space = []
         self.s_space = []
-        print(self.t_points, self.s_points)
 
-    def find_most_lines_cross(self) -> Coordinates:
+    def find_most_lines_cross(self):
 
         pyplot.xlim((-2 * self.delta, 2 * self.delta))
         pyplot.ylim((-2 * self.delta, 2 * self.delta))
@@ -68,14 +66,14 @@ class PcLines:
         u1, v1 = line.find_coordinate(x=0)
         u2, v2 = line.find_coordinate(x=self.delta)
 
-        pyplot.plot([*line.find_coordinate(x=-2 * self.delta)], [*line.find_coordinate(x=2 * self.delta)])
+        pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
         self.plot()
 
         pyplot.show()
 
         print("ratio:", ratio)
 
-        return Coordinates(x=v1, y=v2)
+        return v1, v2
 
     def pc_points(self, points=None, angles=None) -> [Line]:
         created_lines = []
@@ -91,7 +89,6 @@ class PcLines:
         if angles is not None:
             for angle in angles:
                 u = (2 * self.delta / 180) * angle
-                print(angle, u)
                 try:
                     created_lines.append(Line((u, 0), (u, 10)))
                 except SamePointError:
@@ -148,9 +145,7 @@ class PcLines:
         try:
             magnitude = Line(point1, point2).magnitude
         except SamePointError:
-            return
-
-        if magnitude < params.CALIBRATOR_FLOW_THRESHOLD:
+            print("tady2")
             return
 
         l1_s = Line((0, x1), (self.delta, y1))
@@ -159,30 +154,32 @@ class PcLines:
         l1_t = Line((-self.delta, -y1), (0, x1))
         l2_t = Line((-self.delta, -y2), (0, x2))
 
-        u = None
-        v = None
-
         try:
             u, v = l1_s.intersection(l2_s)
+            self.s_space.append(((u, v), magnitude))
+            return
         except NoIntersectionError:
             pass
 
         try:
             u, v = l1_t.intersection(l2_t)
+            self.t_space.append(((u, v), magnitude))
+            return
         except NoIntersectionError:
             pass
 
-        if u is not None and v is not None:
-            if 0 > u > -self.delta:
-                self.t_space.append(((u, v), magnitude))
-            elif 0 < u < self.delta:
-                self.s_space.append(((u, v), magnitude))
+        print("tady")
 
     def plot(self) -> None:
         x_val = [x[0] for x in self.s_points]
         y_val = [x[1] for x in self.s_points]
 
         pyplot.plot(x_val, y_val, 'ro')
+
+        x_val = [x[0][0] for x in self.s_space]
+        y_val = [x[0][1] for x in self.s_space]
+
+        pyplot.plot(x_val, y_val, 'bo')
 
         # x_val = [x[0][0] for x in self.t_space]
         # y_val = [x[0][1] for x in self.t_space]

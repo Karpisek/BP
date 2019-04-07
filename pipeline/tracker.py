@@ -44,6 +44,13 @@ class Tracker(ThreadedPipeBlock):
             tracked_object_lifelines = self._tracked_object_repository.lifelines
             message = sequence_number, serialized_tracked_objects, tracked_object_lifelines
 
+        elif target == params.CALIBRATOR_ID:
+            outer_masks = self._tracked_object_repository.all_boxes_mask(area_size="outer")
+            outer_masks_no_border = self._tracked_object_repository.all_boxes_mask(area_size="small-outer")
+            lifelines = self._tracked_object_repository.lifelines
+
+            message = sequence_number, outer_masks, outer_masks_no_border, lifelines
+
         elif target == params.OBSERVER_ID:
             serialized_tracked_objects = self._tracked_object_repository.serialize()
 
@@ -75,6 +82,11 @@ class Tracker(ThreadedPipeBlock):
         if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
             _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
+
+        if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
+            self._send_message(target=params.CALIBRATOR_ID,
+                               sequence_number=sequence_number,
+                               block=False)
 
         if is_frequency(sequence_number, params.OBSERVER_FREQUENCY):
             self._send_message(target=params.OBSERVER_ID,

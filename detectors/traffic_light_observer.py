@@ -65,7 +65,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
             self._current_status = np.array([1, 1, 1, 1])
             self._current_status[index] = 0
 
-            print(TrafficLightsObserver.colors[int(index)])
+            # print(TrafficLightsObserver.colors[int(index)])
             return TrafficLightsObserver.colors[int(index)]
         return None
 

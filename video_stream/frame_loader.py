@@ -45,6 +45,8 @@ class FrameLoader(ThreadedPipeBlock):
         if status is False:
             return
 
+        if self._info.resize:
+            image = cv2.resize(image, (self._info.width, self._info.height))
         # foreground = self._subtractor.apply(image)
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):

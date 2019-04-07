@@ -174,7 +174,6 @@ class TrafficCorridorRepository:
                 best_line_ratio = num
                 best_line = line
 
-
         self._stop_line = best_line
         self._stopline_found = True
 
@@ -185,7 +184,7 @@ class TrafficCorridor:
         self.left_point = left_point
         self.right_point = right_point
 
-        print(left_point, right_point)
+        # print(left_point, right_point)
 
     @property
     def id(self):

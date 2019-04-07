@@ -4,6 +4,7 @@ import params
 
 from pipeline import PipeBlock
 
+
 class VideoPlayer(PipeBlock):
     def __init__(self, info):
         super().__init__(pipe_id=params.VIDEO_PLAYER_ID)

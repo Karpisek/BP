@@ -9,19 +9,22 @@ import params
 
 
 # VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00002.MTS"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00003.MTS"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00002.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/v2.mp4"q
-
+#
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1b.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2b.mp4"
-VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
+# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
+# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548342000.mp4"
+# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
 
 PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/small_longer.pb'
 PATH_TO_LIGHTS_MODEL = 'detectors/models/traffic_light_detectors/bad_detector.pb'
@@ -53,7 +56,7 @@ traffic_lights_observer = TrafficLightsObserver(info=video_player,
 
 # car tracker
 tracker = Tracker(info=video_info,
-                  output=[observer])
+                  output=[observer, calibrator])
 
 # traffic lights finder
 traffic_lights_finder = TrafficLightsFinder(info=video_info)

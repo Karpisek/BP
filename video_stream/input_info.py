@@ -14,6 +14,15 @@ class Info:
         self._fps = self.input.get(cv2.CAP_PROP_FPS)
         self._height = self.input.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self._width = self.input.get(cv2.CAP_PROP_FRAME_WIDTH)
+
+        if self._width > params.FRAME_LOADER_MAX_WIDTH:
+            ratio = self._height / self._width
+            self._width = params.FRAME_LOADER_MAX_WIDTH
+            self._height = self._width * ratio
+            self._resize = True
+        else:
+            self._resize = False
+
         self._frame_count = self.input.get(cv2.CAP_PROP_FRAME_COUNT)
 
         self._path = path
@@ -26,14 +35,18 @@ class Info:
         self._corridors_repository = TrafficCorridorRepository(self)
 
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height/3),
+                                        top_left=Coordinates(0, self.height/2),
                                         bottom_right=Coordinates(self.width, self.height))
 
         self._tracker_update_area = Area(info=self,
-                                         top_left=Coordinates(0, self.height/4),
+                                         top_left=Coordinates(0, self.height/2),
                                          bottom_right=Coordinates(self.width, self.height))
 
         print(f"INFO: fps: {self.fps}, height: {self.height}, width: {self.width}, frame count: {self.frame_count}")
+
+    @property
+    def resize(self):
+        return self._resize
 
     @property
     def frame_count(self):
@@ -102,8 +115,8 @@ class Info:
 
                 self.vanishing_points[i].draw_line(image=image,
                                                    point=p,
-                                                   color=params.RANDOM_COLOR[i],
-                                                   thickness=1)
+                                                   color=params.COLOR_YELLOW,
+                                                   thickness=2)
 
         return image
 
@@ -149,13 +162,7 @@ class Info:
                    color=color3,
                    thickness=params.FILL)
 
-    def vp1_preset_points(self) -> ([(int, int)]):
-        points = []
-        for x in range(int((2 * self.width) / params.CALIBRATOR_GRID_DENSITY)):
-            for y in range(int(self.height / params.CALIBRATOR_GRID_DENSITY)):
-                new_x = int(x * params.CALIBRATOR_GRID_DENSITY - self.width / 2)
-                new_y = int(y * params.CALIBRATOR_GRID_DENSITY - 9 * self.height / 10)
+    def resize(self, width, height):
+        self._width = width
+        self._width = height
 
-                points.append((new_x, new_y))
-
-        return points

@@ -93,18 +93,14 @@ class TrackedObjectsRepository:
 
     def predict(self) -> None:
         for tracked_object in self._tracked_objects:
-            new_lifeline = tracked_object.predict()
-
-            if new_lifeline is not None:
-                self._lifelines.append(new_lifeline)
+            tracked_object.predict()
 
     def control_boxes(self) -> None:
 
         for tracked_object in self._tracked_objects:
             if not self._info.update_area.contains(tracked_object.center):
-                if tracked_object.lifetime > 0:
-                    if tracked_object.history.y > tracked_object.center.y:
-                        self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+                if tracked_object.history.y > tracked_object.center.y:
+                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
 
                 self._tracked_objects.remove(tracked_object)
 

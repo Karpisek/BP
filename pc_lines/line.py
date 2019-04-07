@@ -15,7 +15,8 @@ class NotOnLineError(Exception):
 
 
 def ransac(creator_points, voting_points, ransac_threshold):
-    best_line_ratio = 0
+    best_line_voters = 0
+    best_line_average_distance = np.inf
     best_line = None
 
     print(len(creator_points))
@@ -30,18 +31,23 @@ def ransac(creator_points, voting_points, ransac_threshold):
                 continue
 
             accepted_points = 0
+            sum_distance = 0
             for point in voting_points:
                 distance = line.point_distance(point)
 
                 if distance < ransac_threshold:
                     accepted_points += 1
+                    sum_distance += distance
 
-            # self.debug_spaces_print(line)
-            if accepted_points > best_line_ratio:
-                best_line_ratio = accepted_points
-                best_line = line
+            if accepted_points >= best_line_voters and accepted_points != 0:
 
-    return best_line, best_line_ratio
+                distance_avg = sum_distance / accepted_points
+                if accepted_points > best_line_voters or distance_avg < best_line_average_distance:
+                    best_line_voters = accepted_points
+                    best_line_average_distance = distance_avg
+                    best_line = line
+
+    return best_line, best_line_voters
 
 
 class Line:
