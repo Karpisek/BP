@@ -1,10 +1,10 @@
 import params
 
-from bbox import TrackedObject, TrackedObjectsRepository
+from bbox import TrackedObjectsRepository
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock
 from munkres import Munkres
-from pipeline.pipeline import is_frequency
+from pipeline.base.pipeline import is_frequency
 
 
 def transpose_matrix(matrix):
@@ -70,7 +70,7 @@ class Tracker(ThreadedPipeBlock):
 
         else:
             for detected_object in detected_objects:
-                coordinates, size, confident_score = detected_object
+                coordinates, size, confident_score, _ = detected_object
 
                 if self._info.start_area.contains(coordinates):
                     self._tracked_object_repository.new_tracked_object(*detected_object)
@@ -98,7 +98,7 @@ class Tracker(ThreadedPipeBlock):
         for old_object in self._tracked_object_repository.list:
             row = []
             for new_box in detected_boxes:
-                new_coordinates, new_size, new_score = new_box
+                new_coordinates, new_size, new_score, _ = new_box
 
                 if old_object.in_radius(new_coordinates):
                     row.append(old_object.center.distance(new_coordinates))
@@ -126,12 +126,12 @@ class Tracker(ThreadedPipeBlock):
                 except ValueError:
                     pass
 
-                new_coordinates, size, score = new_box
+                new_coordinates, size, score, _ = new_box
                 old_box.update_position(size, score, new_coordinates)
 
         for new_box in detected_boxes:
             if new_box[2] > params.TRACKER_MINIMAL_SCORE:
-                coordinates, size, confident_score = new_box
+                coordinates, size, confident_score, _ = new_box
 
                 if self._info.start_area.contains(coordinates):
                     self._tracked_object_repository.new_tracked_object(*new_box)

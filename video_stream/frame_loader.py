@@ -1,24 +1,14 @@
-import time
-
 import cv2
 import numpy as np
 
 import params
 
 from pipeline import ThreadedPipeBlock
-from pipeline.pipeline import is_frequency
-
-IMAGE_WIDTH_FOR_CNN = 900
+from pipeline.base.pipeline import is_frequency
 
 
 class FrameLoader(ThreadedPipeBlock):
     def __init__(self, output, info):
-        """
-        Loads frames from given path and saves them in Queue
-        async using multiprocessing
-        :param path: given path for input
-        """
-
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._info = info
         self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
@@ -26,28 +16,27 @@ class FrameLoader(ThreadedPipeBlock):
 
         self._uncalibrated_phase = True
 
-    def _step(self, seq):
-        """
-        runs until are images in input stream
-        saves them to queue
-        :return: none
-        """
+    def _start(self):
+        if not self._info.traffic_lights_repository.ready:
+            final_image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
 
+            for _ in range(params.DETECTOR_LIGHT_IMAGE_ROW):
+                image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
+
+                final_image = np.maximum(final_image, image)
+
+            self._info.traffic_lights_repository.find(image=final_image)
+            self._info.reopen()
+
+    def _step(self, seq):
         if self._uncalibrated_phase and self._info.calibrated:
             self._info.reopen()
             self._uncalibrated_phase = False
 
-        status, image = self._info.input.read()
+        image = self._info.read()
 
         for _ in range(int(self._info.fps / 20)):
-            status, image = self._info.input.read()
-
-        if status is False:
-            return
-
-        if self._info.resize:
-            image = cv2.resize(image, (self._info.width, self._info.height))
-        # foreground = self._subtractor.apply(image)
+            image = self._info.read()
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
             message = (seq, np.copy(image))
@@ -66,18 +55,5 @@ class FrameLoader(ThreadedPipeBlock):
             self.send(message, pipe_id=params.TRACKER_ID)
 
         if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):
-
-            height, width, _ = image.shape
-            scale = height / width
-            image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
-
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.DETECTOR_CAR_ID)
-
-        if is_frequency(seq, params.DETECTOR_LIGHT_FREQUENCY):
-            height, width, _ = image.shape
-            scale = height / width
-            image = cv2.resize(image, (IMAGE_WIDTH_FOR_CNN, int(IMAGE_WIDTH_FOR_CNN * scale)))
-
-            message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.DETECTOR_LIGHT_ID)

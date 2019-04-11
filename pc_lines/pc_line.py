@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot
 
-from .line import Line, NoIntersectionError, SamePointError, ransac
+from .line import Line, NoIntersectionError, SamePointError, ransac, NotOnLineError
 import params
 
 
@@ -63,17 +63,33 @@ class PcLines:
                              voting_points=self.s_points,
                              ransac_threshold=params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta)
 
-        u1, v1 = line.find_coordinate(x=0)
-        u2, v2 = line.find_coordinate(x=self.delta)
+        try:
+            u1, v1 = line.find_coordinate(x=0)
+            u2, v2 = line.find_coordinate(x=self.delta)
 
-        pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
-        self.plot()
+            pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
+            self.plot()
 
-        pyplot.show()
+            pyplot.show()
 
-        print("ratio:", ratio)
+            print("ratio:", ratio)
 
-        return v1, v2
+            return v1, v2
+
+        except NotOnLineError:
+            u1, v1 = line.find_coordinate(y=0)
+            angle = (u1 + self.delta) * 180 / (2 * self.delta)
+
+            pyplot.plot([line.find_coordinate(y=-2 * self.delta)[0], line.find_coordinate(y=2 * self.delta)[0]], [line.find_coordinate(y=-2 * self.delta)[1], line.find_coordinate(y=2 * self.delta)[1]])
+            self.plot()
+
+            pyplot.show()
+
+            print("ratio:", ratio)
+
+            return angle, None
+
+
 
     def pc_points(self, points=None, angles=None) -> [Line]:
         created_lines = []

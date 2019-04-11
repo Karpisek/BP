@@ -64,7 +64,7 @@ class TrackedObjectsRepository:
     def lifelines(self):
         return self._lifelines
 
-    def new_tracked_object(self, coordinates, size, confident_score):
+    def new_tracked_object(self, coordinates, size, confident_score, _):
         new_object = TrackedObject(coordinates=coordinates,
                                    size=size,
                                    confident_score=confident_score,

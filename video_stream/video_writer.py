@@ -1,9 +1,7 @@
-import time
 import cv2
 import params
 
 from pipeline import PipeBlock
-from pipeline.pipeline import is_frequency
 
 
 class VideoWriter(PipeBlock):

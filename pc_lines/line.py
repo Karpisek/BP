@@ -170,11 +170,11 @@ class Line:
 
         if x is not None:
             if self.b == 0:
-                return -self.c/self.a, x
+                raise NotOnLineError
             return x, ((-self.a) * x - self.c) / self.b
         else:
             if self.a == 0:
-                return y, -self.c/self.b
+                raise NotOnLineError
             return ((-self.b) * y - self.c) / self.a, y
 
     def draw(self, image, color, thickness) -> None:

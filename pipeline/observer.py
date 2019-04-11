@@ -1,8 +1,9 @@
 import cv2
 
 import params
-from detectors import Color, Coordinates
+from detectors import Coordinates
 from pipeline import ThreadedPipeBlock, is_frequency
+from pipeline.traffic_light_observer import Color
 
 
 class Box2D:

@@ -16,16 +16,13 @@ class VideoPlayer(PipeBlock):
         self._info = info
 
     def start(self):
-
-        cv2.namedWindow("image")
-
         clock = time.time()
         frame_counter = 0
 
-        seq, image = self.receive(params.FRAME_LOADER_ID)
-        frame_counter += 1
-
         while True:
+            seq, image = self.receive(params.FRAME_LOADER_ID)
+            frame_counter += 1
+
             observer_seq, boxes, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
 
             [box.draw(image) for box in boxes]
@@ -33,9 +30,11 @@ class VideoPlayer(PipeBlock):
             self._info.draw_vanishing_points(image)
 
             image_with_corridors = self._info.draw_corridors(image)
-            self._info.draw(image_with_corridors, lights_state)
+            image_with_traffic_lights = self._info.draw_detected_traffic_lights(image_with_corridors)
 
-            cv2.imshow("image", image_with_corridors)
+            # self._info.draw(image_with_corridors, lights_state)
+
+            cv2.imshow("image", image_with_traffic_lights)
 
             key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
@@ -54,8 +53,5 @@ class VideoPlayer(PipeBlock):
 
             if seq == self._info.frame_count:
                 break
-
-            seq, image = self.receive(params.FRAME_LOADER_ID)
-            frame_counter += 1
 
         cv2.destroyAllWindows()
