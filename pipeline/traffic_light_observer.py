@@ -79,9 +79,9 @@ class TrafficLightsObserver(ThreadedPipeBlock):
                 self._state_candidate = Color.GREEN
                 self._state_candidate_count = 5
 
-        if self._state_candidate_count > 2:
+        if self._state_candidate_count > 1:
             self._state_candidate_count = 0
             self._state_values = new_status
             self._state = self._state_candidate
 
-        print(self._state)
+        return self._state

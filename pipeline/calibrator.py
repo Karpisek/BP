@@ -1,4 +1,5 @@
-from bbox import Coordinates, TrackedObject
+from bbox.coordinates import Coordinates
+from bbox.tracked_object import TrackedObject
 from pc_lines.line import Line, SamePointError
 from pc_lines.pc_line import PcLines
 from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
@@ -26,17 +27,20 @@ class Calibrator(ThreadedPipeBlock):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
         seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-        if len(self._info.vanishing_points) < 1:
-            self.detect_first_vp(lifelines)
+        if not self._info.calibrated:
+            if len(self._info.vanishing_points) < 1:
+                self.detect_first_vp(lifelines)
 
-        elif len(self._info.vanishing_points) < 2:
-            self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+            elif len(self._info.vanishing_points) < 2:
+                self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
 
-        elif len(self._info.vanishing_points) < 3:
-            self.calculate_third_vp()
+            elif len(self._info.vanishing_points) < 3:
+                self.calculate_third_vp()
 
-        elif len(lifelines) > params.CORRIDORS_MINIMUM_LIFELINES:
-            self.find_corridors(lifelines)
+            elif len(lifelines) > params.CORRIDORS_MINIMUM_LIFELINES:
+                self.find_corridors(lifelines)
+
+        else:
             exit()
 
     def detect_first_vp(self, lifelines):
@@ -121,4 +125,5 @@ class Calibrator(ThreadedPipeBlock):
                                             color=params.COLOR_LIFELINE,
                                             thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
 
-        self._info.corridors_repository.find_corridors(mask)
+        self._info.corridors_repository.find_corridors(lifelines_mask=mask,
+                                                       vp1=self._info.vanishing_points[0])

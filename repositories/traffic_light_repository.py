@@ -99,8 +99,6 @@ class TrafficLight:
         self._top_left = top_left.tuple()
         self._bottom_right = bottom_right.tuple()
 
-        print(self._top_left, self._bottom_right)
-
     def state_counts(self, image):
         light_roi = image[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
 

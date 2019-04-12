@@ -25,10 +25,12 @@ import params
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
-# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548342000.mp4"
-VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
+VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548342000.mp4"
+# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
 
-PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd_car_detection_model.pb'
+PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd2.pb'
+# PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd_car_detection_model.pb'
+
 PATH_TO_LIGHTS_MODEL = 'detectors/models/traffic_light_detectors/rcnn_coco_model.pb'
 
 

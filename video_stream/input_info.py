@@ -23,12 +23,12 @@ class Info:
         self._traffic_lights_repository = TrafficLightsRepository(model=light_detection_model, info=self)
         self._corridors_repository = TrafficCorridorRepository(self)
 
-        print("taday")
+        self._detect_vanishing_points = True
         # solve given program arguments
         self._solve_program_arguments(program_arguments)
 
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height/2),
+                                        top_left=Coordinates(0, self.height/3),
                                         bottom_right=Coordinates(self.width, self.height))
 
         self._tracker_update_area = Area(info=self,
@@ -45,13 +45,13 @@ class Info:
         if program_arguments.insert_corridors:
             print("Please select edges of corridors in frame")
 
+            self._corridors_repository.select_manually(image)
+            self._detect_vanishing_points = False
+
         if program_arguments.insert_light:
             print("Please select as accurate as possible rectangle containing traffic light")
 
             self._traffic_lights_repository.select_manually(image)
-
-        if program_arguments.insert_stop_line:
-            print("Please select stop line")
 
     @property
     def traffic_lights_repository(self):
@@ -62,16 +62,12 @@ class Info:
         return self._ratio
 
     @property
-    def traffic_lights_repository(self):
-        return self._traffic_lights_repository
-
-    @property
     def frame_count(self):
         return self._frame_count
 
     @property
     def calibrated(self):
-        return self._corridors_repository.ready
+        return True if not self._detect_vanishing_points else self._corridors_repository.ready
 
     @property
     def principal_point(self) -> Coordinates:
@@ -140,7 +136,7 @@ class Info:
     def draw_detected_traffic_lights(self, image) -> np.ndarray:
         return self.traffic_lights_repository.draw(image)
 
-    def draw(self, image, lights_status):
+    def draw_syntetic_traffic_lights(self, image, lights_status):
         color1 = params.COLOR_GRAY
         color2 = params.COLOR_GRAY
         color3 = params.COLOR_GRAY

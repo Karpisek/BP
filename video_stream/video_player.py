@@ -29,10 +29,11 @@ class VideoPlayer(PipeBlock):
 
             self._info.draw_vanishing_points(image)
 
-            image_with_corridors = self._info.draw_corridors(image)
+            # image_with_corridors = self._info.draw_corridors(image)
+            image_with_corridors = image
             image_with_traffic_lights = self._info.draw_detected_traffic_lights(image_with_corridors)
 
-            # self._info.draw(image_with_corridors, lights_state)
+            self._info.draw_syntetic_traffic_lights(image_with_corridors, lights_state)
 
             cv2.imshow("image", image_with_traffic_lights)
 

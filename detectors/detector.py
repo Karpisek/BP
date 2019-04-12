@@ -55,10 +55,14 @@ class Detector(ThreadedPipeBlock):
             if score < params.DETECTOR_MINIMAL_SCORE:
                 break
 
-            center, size = self.convert_box_to_centroid_object(box)
-            new_box = (center, size, score, class_id)
+            if class_id not in params.DETECTOR_CAR_CLASSES_IDS:
+                continue
 
-            final_boxes.append(new_box)
+            center, size = self.convert_box_to_centroid_object(box)
+
+            if size.square_size < 0.1:
+                new_box = (center, size, score, class_id)
+                final_boxes.append(new_box)
 
         return final_boxes
 

@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 import params
+from bbox.size import ObjectSize
 from bbox.coordinates import Coordinates
 from pc_lines.line import Line, SamePointError, NotOnLineError
 
@@ -98,7 +99,7 @@ class TrackedObjectsRepository:
     def control_boxes(self) -> None:
 
         for tracked_object in self._tracked_objects:
-            if not self._info.update_area.contains(tracked_object.center):
+            if not self._info.update_area.contains(tracked_object.tracker_point):
                 if tracked_object.history.y > tracked_object.center.y:
                     self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
 
@@ -196,7 +197,9 @@ class TrackedObject:
         super().__init__()
 
         self._id = object_id
-        self._object_size = size
+
+        self._reference_object_size = size
+        self._reference_coordinates = coordinates
 
         self.score = confident_score
 
@@ -225,6 +228,10 @@ class TrackedObject:
         return self._start_coordinates
 
     @property
+    def tracker_point(self):
+        return Coordinates(x=self.center.x, y=int(self.center.y + self.size.height/2))
+
+    @property
     def id(self) -> int:
         return self._id
 
@@ -234,35 +241,42 @@ class TrackedObject:
 
     @property
     def size(self) -> (int, int):
-        return self._object_size
+        vp1 = self._info.vanishing_points[0]
+
+        dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
+
+        current_width = self._reference_object_size.width * dist_diff
+        current_height = self._reference_object_size.height * dist_diff
+
+        return ObjectSize(current_width, current_height)
 
     @property
     def velocity(self) -> (int, int):
         return int(np.abs(self._kalman.statePost[2][0])), int(np.abs(self._kalman.statePost[3][0]))
 
     @property
-    def left_top_anchor(self) -> Coordinates:
+    def left_top_anchor(self):
         x = int((self.center.x - self.size.width / 2))
         y = int((self.center.y - self.size.height / 2))
 
         return Coordinates(x, y)
 
     @property
-    def left_bot_anchor(self) -> Coordinates:
+    def left_bot_anchor(self):
         x = int((self.center.x - self.size.width / 2))
         y = int((self.center.y + self.size.height / 2))
 
         return Coordinates(x, y)
 
     @property
-    def right_top_anchor(self) -> Coordinates:
+    def right_top_anchor(self):
         x = int((self.center.x + self.size.width / 2))
         y = int((self.center.y - self.size.height / 2))
 
         return Coordinates(x, y)
 
     @property
-    def right_bot_anchor(self) -> Coordinates:
+    def right_bot_anchor(self):
         x = int((self.center.x + self.size.width / 2))
         y = int((self.center.y + self.size.height / 2))
 
@@ -312,7 +326,9 @@ class TrackedObject:
         self._kalman.correct(mesurement)
 
         self.score = score
-        self._object_size = size
+
+        self._reference_object_size = size
+        self._reference_coordinates = new_coordinates
 
     def update_flow(self, old_positions, new_positions) -> None:
         x_flow, y_flow = self.extract_flow(old_positions, new_positions)
