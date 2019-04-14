@@ -13,9 +13,20 @@ class Box2D:
         self._top_left = None
         self._bottom_right = None
         self._car_info = car_info
+
         self._red_rider = False
+        self._red_stander = False
+        self._orange_rider = False
 
         self._lifetime = 1
+
+    @property
+    def initialized(self):
+        return self._top_left is not None
+
+    @property
+    def red_rider(self):
+        return self._red_rider
 
     @property
     def lifetime(self):
@@ -28,15 +39,34 @@ class Box2D:
     def tic(self):
         self._lifetime -= 1
 
-    def red_check(self, info):
-        self._red_rider = self._red_rider or info.corridors_repository.red_line_crossed(self.tracker_point)
+    def update(self, anchors, lights_state, info):
+        previous_coordinates = None
 
-    def update(self, anchors):
+        if self.initialized:
+            previous_coordinates = self.tracker_point
+
         self._top_left, self._bottom_right, _ = anchors
         self._lifetime += 1
 
+        if previous_coordinates is not None:
+            if lights_state == Color.RED or lights_state == Color.RED_ORANGE:
+                if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
+                    self._red_rider = True
+
+                if info.corridors_repository.behind_line(self.tracker_point):
+                    self._red_stander = True
+
+            if lights_state == Color.ORANGE:
+                if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
+                    self._orange_rider = True
+
     def draw(self, image):
-        color = params.COLOR_RED if self._red_rider else params.COLOR_GREEN
+        if self._red_rider:
+            color = params.COLOR_RED
+        elif self._orange_rider:
+            color = params.COLOR_ORANGE
+        else:
+            color = params.COLOR_GREEN
 
         cv2.rectangle(img=image,
                       pt1=self._top_left,
@@ -68,17 +98,18 @@ class Box2D:
 class BBoxRepository:
     def __init__(self):
         self._boxes = {}
+        self._red_riders_count = 0
 
-    def insert_or_update(self, anchors, car_id):
+    def insert_or_update(self, anchors, car_id, lights_state, info):
         if car_id not in self._boxes:
             self._boxes[car_id] = Box2D(car_id)
 
-        self._boxes[car_id].update(anchors)
+        self._boxes[car_id].update(anchors, lights_state, info)
 
-    def check_red_light(self, lights_state, info):
-        if lights_state == Color.RED:
-            for key, box in self._boxes.items():
-                box.red_check(info)
+    # def check_red_light(self, lights_state, info):
+    #     if lights_state == Color.RED:
+    #         for key, box in self._boxes.items():
+    #             self._red_riders_count += box.red_check(info)
 
     def check_lifetime(self):
         for key, box in self._boxes.copy().items():
@@ -109,9 +140,8 @@ class Observer(ThreadedPipeBlock):
 
         for tracked_object in tracked_objects:
             anchors, _, car_info = tracked_object
-            self._bounding_boxes_repository.insert_or_update(anchors, car_info)
+            self._bounding_boxes_repository.insert_or_update(anchors, car_info, current_lights_state, self._info)
 
-        self._bounding_boxes_repository.check_red_light(current_lights_state, self._info)
         self._bounding_boxes_repository.check_lifetime()
 
         # TODO detekce zastaveni
@@ -127,5 +157,9 @@ class Observer(ThreadedPipeBlock):
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
             message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+
+        # if is_frequency(seq, params.VIDEO_WRITER_FREQUENCY):
+        #     message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
+        #     self.send(message, pipe_id=params.VIDEO_WRITER_ID)
 
         self._previous_lights_state = current_lights_state

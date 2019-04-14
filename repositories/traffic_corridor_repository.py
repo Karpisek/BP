@@ -7,7 +7,7 @@ from pc_lines.pc_line import PcLines
 from pc_lines.vanishing_point import VanishingPoint
 
 
-def _mouse_callback(event, x, y, flags, param):
+def _mouse_callback(event, x, y, _, param):
     corridor_maker = param
 
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -69,7 +69,14 @@ class TrafficCorridorRepository:
         self._stopline_found = True
         self._corridors_found = True
 
-    def red_line_crossed(self, coordinates):
+    def line_crossed(self, previous_coordinates, coordinates):
+        if not self.ready:
+            return False
+
+        red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
+        return previous_coordinates.y > red_line_point[1] > coordinates.y
+
+    def behind_line(self, coordinates):
         if not self.ready:
             return False
 
@@ -325,6 +332,12 @@ class StopLineMaker(LineDrag):
             self.line = Line(self.point1, self.point2)
         except SamePointError:
             pass
+
+    def draw(self, image):
+        super().draw(image)
+
+        if self.line is not None:
+            self.line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def run(self, info) -> []:
         cv2.namedWindow("select_stop_line")

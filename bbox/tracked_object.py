@@ -307,7 +307,6 @@ class TrackedObject:
         image = np.zeros(shape=(self._info.height, self._info.width))
 
         cv2.rectangle(image, (x_min, y_min), (x_max, y_max), 200, 2)
-        cv2.imwrite("tet.jpg", image)
 
         x_size = (x_max - x_min)
         y_size = (y_max - y_min)
@@ -355,6 +354,9 @@ class TrackedObject:
             current_height = self._reference_object_size.height * dist_diff
 
             self._current_size = ObjectSize(current_width, current_height)
+
+        else:
+            self._current_size = self._reference_object_size
 
     def update_position(self, size, score, new_coordinates) -> None:
         mesurement = np.array([

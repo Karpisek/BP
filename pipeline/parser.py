@@ -9,14 +9,13 @@ class ParametersError(Exception):
 class InputParser:
     def __init__(self, argv):
         try:
-            opts, args = getopt.getopt(argv, "lcs", ["light", "corridors", "stop-line"])
+            opts, args = getopt.getopt(argv, "lcs", ["light", "corridors", "input", "output"])
 
         except getopt.GetoptError:
             raise ParametersError
 
         self._light = False
         self._corridors = False
-        self._stop_line = False
 
         for opt, arg in opts:
                 
@@ -25,9 +24,6 @@ class InputParser:
 
             if opt in ("-c", "--corridors"):
                 self._corridors = True
-                
-            if opt in ("-s", "--stop-line"):
-                self._stop_line = True
 
     @property
     def insert_light(self):
@@ -36,7 +32,3 @@ class InputParser:
     @property
     def insert_corridors(self):
         return self._corridors
-
-    @property
-    def insert_stop_line(self):
-        return self._stop_line
