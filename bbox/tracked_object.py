@@ -66,14 +66,24 @@ class TrackedObjectsRepository:
         return self._lifelines
 
     def new_tracked_object(self, coordinates, size, confident_score, _):
+
         new_object = TrackedObject(coordinates=coordinates,
                                    size=size,
                                    confident_score=confident_score,
                                    info=self._info,
                                    object_id=self._id_counter)
 
-        self._tracked_objects.append(new_object)
-        self._id_counter += 1
+        collision = False
+        for index, tracked_object in enumerate(self._tracked_objects[:]):
+            if tracked_object.overlap(new_object) > 0.1:
+                new_object.id = tracked_object.id
+                self._tracked_objects[index] = new_object
+                collision = True
+                break
+
+        if not collision:
+            self._tracked_objects.append(new_object)
+            self._id_counter += 1
 
     def count(self) -> int:
         return len(self._tracked_objects)
@@ -198,7 +208,7 @@ class TrackedObject:
 
         self._id = object_id
 
-        self._reference_object_size = size
+        self._reference_object_size = self._current_size = size
         self._reference_coordinates = coordinates
 
         self.score = confident_score
@@ -235,20 +245,17 @@ class TrackedObject:
     def id(self) -> int:
         return self._id
 
+    @id.setter
+    def id(self, value):
+        self._id = value
+
     @property
     def center(self):
         return Coordinates(int(self._kalman.statePost[0][0]), int(self._kalman.statePost[1][0]))
 
     @property
     def size(self) -> (int, int):
-        vp1 = self._info.vanishing_points[0]
-
-        dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
-
-        current_width = self._reference_object_size.width * dist_diff
-        current_height = self._reference_object_size.height * dist_diff
-
-        return ObjectSize(current_width, current_height)
+        return self._current_size
 
     @property
     def velocity(self) -> (int, int):
@@ -290,6 +297,32 @@ class TrackedObject:
     def radius(self):
         return int(np.sqrt(self.size.width * self.size.width + self.size.height * self.size.height) / 2)
 
+    def overlap(self, overlapping_object):
+
+        x_min = np.max((self.left_top_anchor.x, overlapping_object.left_top_anchor.x))
+        y_min = np.max((self.left_top_anchor.y, overlapping_object.left_top_anchor.y))
+        x_max = np.min((self.right_bot_anchor.x, overlapping_object.right_bot_anchor.x))
+        y_max = np.min((self.right_bot_anchor.y, overlapping_object.right_bot_anchor.y))
+
+        image = np.zeros(shape=(self._info.height, self._info.width))
+
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), 200, 2)
+        cv2.imwrite("tet.jpg", image)
+
+        x_size = (x_max - x_min)
+        y_size = (y_max - y_min)
+
+        # no overlapping
+        if x_size < 0 or y_size < 0:
+            return 0
+
+        overlapped_square_size = x_size * y_size
+
+        return overlapped_square_size / self.square_size()
+
+    def square_size(self):
+        return self.size.width * self.size.height
+
     def area(self, area_size) -> int:
         if area_size == "inner":
             return self.radius if self.radius < 20 else 20
@@ -313,6 +346,15 @@ class TrackedObject:
         if self.center.y < self.history.y:
             if self.lifetime == 0:
                 return self.history.tuple(), self.center.tuple()
+
+        if self._info.calibrated:
+            vp1 = self._info.vanishing_points[0]
+            dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
+
+            current_width = self._reference_object_size.width * dist_diff
+            current_height = self._reference_object_size.height * dist_diff
+
+            self._current_size = ObjectSize(current_width, current_height)
 
     def update_position(self, size, score, new_coordinates) -> None:
         mesurement = np.array([
@@ -343,14 +385,16 @@ class TrackedObject:
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
 
-    def in_radius(self, new_coordinates) -> int:
+    def in_area(self, new_coordinates):
+        return self.left_top_anchor.x < new_coordinates.x < self.right_bot_anchor.x and self.left_top_anchor.y < new_coordinates.y < self.right_bot_anchor.y
 
+    def in_radius(self, new_coordinates) -> int:
         width = self.size.width
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
 
-        max_pixels = diagonal/2
+        max_pixels = diagonal / 2
 
         return self.center.distance(new_coordinates) < max_pixels
 
@@ -363,7 +407,7 @@ class TrackedObject:
         for flow in zip(new_positions, old_positions):
             new_pos, old_pos = flow
 
-            if self.in_radius(Coordinates(*new_pos)):
+            if self.in_area(Coordinates(*new_pos)):
 
                 new_x, new_y = new_pos
                 old_x, old_y = old_pos

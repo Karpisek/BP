@@ -33,7 +33,10 @@ class FrameLoader(ThreadedPipeBlock):
             self._info.reopen()
             self._uncalibrated_phase = False
 
-        image = self._info.read()
+        try:
+            image = self._info.read()
+        except EOFError:
+            image = None
 
         for _ in range(int(self._info.fps / 20)):
             image = self._info.read()

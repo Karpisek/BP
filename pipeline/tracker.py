@@ -104,6 +104,7 @@ class Tracker(ThreadedPipeBlock):
                     row.append(old_object.center.distance(new_coordinates))
                 else:
                     row.append(params.TRACKER_DISALLOWED)
+
             matrix.append(row)
 
         indexes = self._munkres.compute(matrix)

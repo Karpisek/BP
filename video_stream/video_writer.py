@@ -19,14 +19,15 @@ class VideoWriter(PipeBlock):
         frame_counter += 1
 
         while True:
-            observer_seq, boxes = self.receive(pipe_id=params.OBSERVER_ID)
+            observer_seq, boxes_repository = self.receive(pipe_id=params.OBSERVER_ID)
 
-            [box.draw(image) for box in boxes]
+            image = boxes_repository.draw(image)
+            image = self._info.draw_vanishing_points(image)
 
-            self._info.draw_vanishing_points(image)
+            # image_with_corridors = self._info.draw_corridors(image)
+            image = self._info.draw_detected_traffic_lights(image)
+            image = self._info.draw_syntetic_traffic_lights(image)
 
-            image_with_corridors = self._info.draw_corridors(image)
-
-            self._output.write(image_with_corridors)
+            self._output.write(image)
 
         self._output.release()

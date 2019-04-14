@@ -24,6 +24,7 @@ class Info:
         self._corridors_repository = TrafficCorridorRepository(self)
 
         self._detect_vanishing_points = True
+
         # solve given program arguments
         self._solve_program_arguments(program_arguments)
 
@@ -102,7 +103,15 @@ class Info:
         return self._corridors_repository
 
     def read(self, width=None):
-        _, frame = self._input.read()
+        """
+        :raise EOFError when end of input
+        :return:
+        """
+
+        status, frame = self._input.read()
+
+        if not status:
+            raise EOFError
 
         if width is None:
             return frame
@@ -173,6 +182,8 @@ class Info:
                    radius=5,
                    color=color3,
                    thickness=params.FILL)
+
+        return image
 
     def resize(self, width, height):
         self._width = width

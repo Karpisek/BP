@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import cv2
 
 import params
@@ -7,15 +9,31 @@ from pipeline.traffic_light_observer import Color
 
 
 class Box2D:
-    def __init__(self, anchors, car_info, info, light_status):
-        self._top_left, self._bottom_right, _ = anchors
+    def __init__(self, car_info):
+        self._top_left = None
+        self._bottom_right = None
         self._car_info = car_info
+        self._red_rider = False
 
-        self._red_rider = light_status == Color.RED and info.corridors_repository.red_line_crossed(self.tracker_point)
+        self._lifetime = 1
+
+    @property
+    def lifetime(self):
+        return self._lifetime
 
     @property
     def tracker_point(self):
         return Coordinates((self._bottom_right[0] + self._top_left[0]) / 2, self._bottom_right[1])
+
+    def tic(self):
+        self._lifetime -= 1
+
+    def red_check(self, info):
+        self._red_rider = self._red_rider or info.corridors_repository.red_line_crossed(self.tracker_point)
+
+    def update(self, anchors):
+        self._top_left, self._bottom_right, _ = anchors
+        self._lifetime += 1
 
     def draw(self, image):
         color = params.COLOR_RED if self._red_rider else params.COLOR_GREEN
@@ -47,6 +65,34 @@ class Box2D:
                     thickness=2)
 
 
+class BBoxRepository:
+    def __init__(self):
+        self._boxes = {}
+
+    def insert_or_update(self, anchors, car_id):
+        if car_id not in self._boxes:
+            self._boxes[car_id] = Box2D(car_id)
+
+        self._boxes[car_id].update(anchors)
+
+    def check_red_light(self, lights_state, info):
+        if lights_state == Color.RED:
+            for key, box in self._boxes.items():
+                box.red_check(info)
+
+    def check_lifetime(self):
+        for key, box in self._boxes.copy().items():
+            box.tic()
+            if box.lifetime < 0:
+                self._boxes.pop(key)
+
+    def draw(self, image):
+        for key, box in self._boxes.items():
+            box.draw(image)
+
+        return image
+
+
 class Observer(ThreadedPipeBlock):
     def __init__(self, info, output, pipe_id=params.OBSERVER_ID):
 
@@ -54,44 +100,32 @@ class Observer(ThreadedPipeBlock):
                          output=output)
 
         self._info = info
-        self._current_lights_status = None
+        self._previous_lights_state = None
+        self._bounding_boxes_repository = BBoxRepository()
 
     def _step(self, seq):
         tracker_seq, tracked_objects = self.receive(pipe_id=params.TRACKER_ID)
-        lights_seq, new_lights_status = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+        lights_seq, current_lights_state = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
 
-        if new_lights_status is not None:
-            self._current_lights_status = new_lights_status
-
-        boxes = []
         for tracked_object in tracked_objects:
             anchors, _, car_info = tracked_object
+            self._bounding_boxes_repository.insert_or_update(anchors, car_info)
 
-            boxes.append(Box2D(anchors=anchors,
-                               car_info=car_info,
-                               info=self._info,
-                               light_status=self._current_lights_status))
+        self._bounding_boxes_repository.check_red_light(current_lights_state, self._info)
+        self._bounding_boxes_repository.check_lifetime()
 
-        corridors = {index: [] for index in range(self._info.corridors_repository.count)}
-        boxes.sort(key=lambda b: b.tracker_point.y)
-
-        for box in boxes[:]:
-            corridor_id = self._info.corridors_repository.get_corridor(box.tracker_point)
-
-            if corridor_id == -1:
-                boxes.remove(box)
-            else:
-                corridors[corridor_id].append(box)
-
-        if not self._info.corridors_repository.ready:
-            if new_lights_status == Color.GREEN:
-                for _, corridor in corridors.items():
-
-                    # get the first car in each corridor (if there is any)
-                    if len(corridor):
-                        first_box = corridor[0]
-                        self._info.corridors_repository.add_stop_point(first_box.tracker_point)
+        # TODO detekce zastaveni
+        # if not self._info.corridors_repository.ready:
+        #     if new_lights_state == Color.GREEN:
+        #         for _, corridor in corridors.items():
+        #
+        #             # get the first car in each corridor (if there is any)
+        #             if len(corridor):
+        #                 first_box = corridor[0]
+        #                 self._info.corridors_repository.add_stop_point(first_box.tracker_point)
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
-            message = seq, boxes, self._current_lights_status
+            message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+
+        self._previous_lights_state = current_lights_state

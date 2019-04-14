@@ -1,5 +1,3 @@
-from multiprocessing import Process
-
 import tensorflow as tf
 import numpy as np
 import params

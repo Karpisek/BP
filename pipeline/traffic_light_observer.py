@@ -55,7 +55,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         elif self._state == Color.GREEN:
             if new_status.max() == 0:
                 self._state = Color.GREEN
-                return
+                return None
 
             if diff[1] > 0.2 or diff[2] > 0.2:
                 if self._state_candidate == Color.ORANGE:

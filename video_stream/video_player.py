@@ -23,9 +23,9 @@ class VideoPlayer(PipeBlock):
             seq, image = self.receive(params.FRAME_LOADER_ID)
             frame_counter += 1
 
-            observer_seq, boxes, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
+            observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
 
-            [box.draw(image) for box in boxes]
+            image = boxes_repository.draw(image)
 
             self._info.draw_vanishing_points(image)
 

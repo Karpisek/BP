@@ -29,8 +29,37 @@ class PipeBlock:
     def start(self):
         raise NotImplementedError
 
+    def _run(self):
+        seq = 0
+        self._before()
+
+        while True:
+            try:
+                self._step(seq)
+            except EOFError:
+                self._after()
+                break
+
+    def _before(self):
+        raise NotImplementedError
+
+    def _step(self, seq):
+        raise NotImplementedError
+
+    def _after(self):
+        raise NotImplementedError
+
     def send(self, message, pipe_id, block=True):
-        self._output[pipe_id].deliver(message, pipe_id=self.id, block=block)
+        if message is EOFError:
+            self._delegate_end()
+            raise EOFError
+
+        else:
+            self._output[pipe_id].deliver(message, pipe_id=self.id, block=block)
+
+    def _delegate_end(self):
+        for key, output in self._output.items():
+            output.deliver(EOFError, pipe_id=self.id, block=False)
 
     def deliver(self, message, pipe_id: int, block):
         try:
@@ -40,7 +69,9 @@ class PipeBlock:
 
     def receive(self, pipe_id, block=True):
         try:
-            return self._input[pipe_id].get(block)
+            message = self._input[pipe_id].get(block)
+            return message
+
         except queue.Empty:
             return None
 
@@ -53,6 +84,7 @@ class PipeBlock:
 
 class ThreadedPipeBlock(PipeBlock):
 
+
     def __init__(self, pipe_id, output=None, max_steps=np.inf):
         super().__init__(pipe_id, output)
 
@@ -64,29 +96,47 @@ class ThreadedPipeBlock(PipeBlock):
         self._thread.start()
 
     def _run(self):
-        timer = time.time()
+        # timer = time.time()
         seq = 0
         frame_counter = 0
 
         self._start()
 
-        while seq < self._max_steps:
+        while True:
             frame_counter += 1
             seq += 1
 
-            self._step(seq)
+            try:
+                self._step(seq)
+            except EOFError:
+                self.end()
+                break
 
             if seq % 100 == 0:
                 # print(f"{self.__class__.__name__} FPS: {1000 / (((time.time() - timer) / frame_counter) * 1000)}")
 
                 frame_counter = 0
-                timer = time.time()
+                # timer = time.time()
+
+        print(f"thread final stop stop: {self.__class__}")
+
+    def _after(self):
+        pass
+
+    def _before(self):
+        pass
+
+    def end(self):
+        self._end()
 
     def _step(self, seq):
         raise NotImplementedError
 
     def _start(self):
-        pass
+        print(f"starting thread: {self.__class__}")
+
+    def _end(self):
+        print(f"ending thread: {self.__class__}")
 
 
 class NoOutputError(Exception):
