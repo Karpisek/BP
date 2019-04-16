@@ -9,7 +9,6 @@ class UserEndException(Exception):
 
 
 class VideoPlayer(PipeBlock):
-
     def __init__(self, info, print_fps):
         super().__init__(pipe_id=params.VIDEO_PLAYER_ID, print_fps=print_fps)
 
@@ -18,6 +17,9 @@ class VideoPlayer(PipeBlock):
         self._tracker = None
 
         self._info = info
+
+    def _mode_changed(self, new_mode):
+        pass
 
     def _before(self):
         pass
@@ -29,15 +31,14 @@ class VideoPlayer(PipeBlock):
 
         image = boxes_repository.draw(image)
 
-        self._info.draw_vanishing_points(image)
+        # image = self._info.draw_vanishing_points(image)
 
-        # image_with_corridors = self._info.draw_corridors(image)
-        image_with_corridors = image
-        image_with_traffic_lights = self._info.draw_detected_traffic_lights(image_with_corridors)
+        image = self._info.draw_corridors(image)
+        image = self._info.draw_detected_traffic_lights(image)
 
-        self._info.draw_syntetic_traffic_lights(image_with_corridors, lights_state)
+        self._info.draw_syntetic_traffic_lights(image, lights_state)
 
-        cv2.imshow("image", image_with_traffic_lights)
+        cv2.imshow("image", image)
 
         key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 

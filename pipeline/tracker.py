@@ -4,7 +4,7 @@ from bbox import TrackedObjectsRepository
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock
 from munkres import Munkres
-from pipeline.base.pipeline import is_frequency
+from pipeline.base.pipeline import is_frequency, Mode
 
 
 def transpose_matrix(matrix):
@@ -12,7 +12,6 @@ def transpose_matrix(matrix):
 
 
 class Tracker(ThreadedPipeBlock):
-
     def __init__(self, info, output=None):
         super().__init__(pipe_id=params.TRACKER_ID, output=output)
 
@@ -26,6 +25,10 @@ class Tracker(ThreadedPipeBlock):
         self._optical_flow = OpticalFlow(info, self._tracked_object_repository)
 
         self._munkres = Munkres()
+
+    def _mode_changed(self, new_mode):
+        if new_mode == Mode.DETECTION:
+            self._tracked_object_repository.restart()
 
     def _step(self, seq):
         if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):

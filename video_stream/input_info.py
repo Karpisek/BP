@@ -55,6 +55,13 @@ class Info:
             self._traffic_lights_repository.select_manually(image)
 
     @property
+    def vp1(self):
+        if not self.vanishing_points:
+            return None
+        else:
+            return self.vanishing_points[0]
+
+    @property
     def traffic_lights_repository(self):
         return self._traffic_lights_repository
 

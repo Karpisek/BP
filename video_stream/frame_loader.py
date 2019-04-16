@@ -8,13 +8,14 @@ from pipeline.base.pipeline import is_frequency, Mode
 
 
 class FrameLoader(ThreadedPipeBlock):
+
     def __init__(self, output, info):
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._info = info
         self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
                                                               varThreshold=params.FRAME_LOADER_THRESHOLD)
 
-    def _start(self):
+    def _before(self):
         if not self._info.traffic_lights_repository.ready:
             final_image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
 
@@ -26,10 +27,13 @@ class FrameLoader(ThreadedPipeBlock):
             self._info.traffic_lights_repository.find(image=final_image)
             self._info.reopen()
 
+    def _mode_changed(self, new_mode):
+        if new_mode == Mode.DETECTION:
+            self._info.reopen()
+
     def _step(self, seq):
         if self._mode == Mode.CALIBRATION and self._info.calibrated:
-            self._info.reopen()
-            self._set_mode(new_mode=Mode.DETECTION)
+            self._update_mode(Mode.DETECTION)
 
         image = self._info.read()
 

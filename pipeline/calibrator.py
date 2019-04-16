@@ -8,6 +8,8 @@ from pipeline import ThreadedPipeBlock
 import cv2
 import numpy as np
 import params
+from pipeline.base.pipeline import Mode
+from repositories.traffic_light_repository import Color
 
 
 class SyncError(Exception):
@@ -15,6 +17,7 @@ class SyncError(Exception):
 
 
 class Calibrator(ThreadedPipeBlock):
+
     def __init__(self, output=None, info=None):
         super().__init__(pipe_id=params.CALIBRATOR_ID, output=output)
 
@@ -23,25 +26,27 @@ class Calibrator(ThreadedPipeBlock):
 
         self._detected_lines = []
 
+    def _mode_changed(self, new_mode):
+        if new_mode == Mode.DETECTION:
+            self._end_block()
+
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        seq_lights, light_status = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
         seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
-        if not self._info.calibrated:
+        if not self._info.corridors_repository.corridors_found:
             if len(self._info.vanishing_points) < 1:
                 self.detect_first_vp(lifelines)
 
             elif len(self._info.vanishing_points) < 2:
-                self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border)
+                self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
 
             elif len(self._info.vanishing_points) < 3:
                 self.calculate_third_vp()
 
             elif len(lifelines) > params.CORRIDORS_MINIMUM_LIFELINES:
                 self.find_corridors(lifelines)
-
-        else:
-            exit()
 
     def detect_first_vp(self, lifelines):
         if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
@@ -54,7 +59,10 @@ class Calibrator(ThreadedPipeBlock):
             self._info.vanishing_points.append(VanishingPoint(point=new_vanishing_point))
             self._pc_lines.clear()
 
-    def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border) -> None:
+    def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border, light_status) -> None:
+        if light_status in [Color.RED, Color.RED_ORANGE]:
+            return
+
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
         blured = cv2.blur(selected_areas, (3, 3))
 
@@ -68,6 +76,8 @@ class Calibrator(ThreadedPipeBlock):
                                 maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
 
         vp1 = self._info.vanishing_points[0]
+
+        detected_lines = []
         if lines is not None:
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
@@ -83,10 +93,23 @@ class Calibrator(ThreadedPipeBlock):
                         cv2.line(selected_areas, point1, point2, params.COLOR_WHITE, 1)
                         continue
 
+                    detected_lines.append(Line(point1, point2))
                     self._pc_lines.add_to_pc_space(point1, point2)
                     cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
+
+        # if detected_lines:
+        #     best_lines = sorted(detected_lines, key=lambda l: l.magnitude, reverse=True)
+        #
+        #     line_count = 0
+        #     for line in best_lines:
+        #         line_count += 1
+        #         if line_count > 2:
+        #             break
+        #
+        #         self._pc_lines.add_to_pc_space(line=line)
+        #         line.draw(selected_areas, color=params.COLOR_BLUE, thickness=params.DEFAULT_THICKNESS)
 
         if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_lines_cross()

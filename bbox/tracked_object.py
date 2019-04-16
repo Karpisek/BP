@@ -115,29 +115,13 @@ class TrackedObjectsRepository:
 
                 self._tracked_objects.remove(tracked_object)
 
-        # self._suppression()
-
     def serialize(self):
         return [tracked_object.serialize() for tracked_object in self._tracked_objects]
 
-    # def _suppression(self):
-    #     area_size = "outer"
-    #
-    #     global_mask = self.all_boxes_mask(area_size=area_size)
-    #
-    #     for index, tracked_object in enumerate(self._tracked_objects[::-1]):
-    #         color = index + 1
-    #         ideal_content_size = tracked_object.size.height * tracked_object.size.width
-    #
-    #         left_anchor, right_anchor, _ = tracked_object.anchors()
-    #         object_mask = global_mask[left_anchor[0]: right_anchor[0], left_anchor[1]:right_anchor[1]]
-    #
-    #         no_overlap_content_size = len(np.where(object_mask.reshape(-1) <= color)[0])
-    #
-    #         print(no_overlap_content_size / ideal_content_size)
-    #         if no_overlap_content_size / ideal_content_size < params.TRACKER_SUPPRESSION_MIN:
-    #             self._tracked_objects.remove(tracked_object)
-    #             print("here")
+    def restart(self):
+        self._id_counter = 0
+        self._lifelines = []
+        self._tracked_objects = []
 
 
 class TrackedObject:

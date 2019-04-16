@@ -26,6 +26,7 @@ class PipeBlock:
         self.id = pipe_id
         self._print_fps = print_fps
         self._mode = Mode.CALIBRATION
+        self._previous_mode = Mode.CALIBRATION
 
         self._input = {}
         self._output = {}
@@ -75,6 +76,9 @@ class PipeBlock:
 
         print(f"thread {self.__class__.__name__} finally ended")
 
+    def _end_block(self):
+        raise EOFError
+
     def _before(self):
         raise NotImplementedError
 
@@ -83,6 +87,9 @@ class PipeBlock:
 
     def _after(self):
         PipeBlock.pipes.remove(self)
+
+    def _mode_changed(self, new_mode):
+        raise NotImplementedError
 
     def _delegate_end(self):
         for pipe in PipeBlock.pipes:
@@ -112,19 +119,23 @@ class PipeBlock:
         try:
             mode, message = self._input[pipe_id].get(block)
             if message is EOFError:
-                raise EOFError
+                self._end_block()
 
-            self._mode = mode
+            self._update_mode(mode)
             return message
 
         except Empty:
             return None
 
+    def _update_mode(self, mode):
+        self._previous_mode = self._mode
+        self._mode = mode
+
+        if self._previous_mode != self._mode:
+            self._mode_changed(self._mode)
+
     def connect(self, sender, queue_size):
         self._input[sender.id] = Queue(queue_size)
-
-    def _set_mode(self, new_mode):
-        self._mode = new_mode
 
     def __str__(self):
         return f"{self.__class__.__name__}: {[queue.qsize() for key, queue in self._input.items()]}"

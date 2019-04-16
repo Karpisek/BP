@@ -8,6 +8,9 @@ from pipeline import ThreadedPipeBlock
 
 class Detector(ThreadedPipeBlock):
 
+    def _mode_changed(self, new_mode):
+        pass
+
     def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True, max_steps=np.inf):
 
         super().__init__(pipe_id=detector_type_id, output=output, max_steps=max_steps)

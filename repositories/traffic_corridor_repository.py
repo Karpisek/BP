@@ -29,15 +29,25 @@ class TrafficCorridorRepository:
 
         self._stop_places = []
 
-        self._pc_lines = PcLines(info.width)
-
     @property
     def count(self):
         return self._corridors_count
 
     @property
+    def corridors_found(self):
+        return self._corridors_found
+
+    @property
+    def corridor_ids(self):
+        return self._corridors.keys()
+
+    @property
+    def stopline_found(self):
+        return self._stopline_found
+
+    @property
     def ready(self):
-        return self._corridors_found and self._stopline_found
+        return self.corridors_found and self._stopline_found
 
     @property
     def corridor_mask(self):
@@ -84,6 +94,9 @@ class TrafficCorridorRepository:
         return red_line_point[1] > coordinates.y
 
     def get_corridor(self, coordinates) -> int:
+        if not self._corridors_found:
+            return -1
+
         if 0 < coordinates.x < self._info.width and 0 < coordinates.y < self._info.height:
             return self._corridor_mask[int(coordinates.y)][int(coordinates.x)] - 1
         else:
@@ -150,8 +163,8 @@ class TrafficCorridorRepository:
         # greyscale image and reduce noise by multiple blur and threshold
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
-        edge_grey_blured = cv2.blur(edge_grey, (1, 21))
-        _, threshold = cv2.threshold(edge_grey_blured, 50, 255, cv2.THRESH_BINARY)
+        edge_grey_blured = cv2.medianBlur(edge_grey, 21)
+        _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
 
         height, width = edge_grey_blured.shape
 
@@ -198,7 +211,7 @@ class TrafficCorridorRepository:
 
         # cv2.imwrite("mask.jpg", self.get_mask())
         cv2.imwrite("lifeline.jpg", frame_edge)
-        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
+        cv2.imwrite("lifeline_before.jpg", edge_grey_blured)
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
         self._corridors_found = True
@@ -215,6 +228,13 @@ class TrafficCorridorRepository:
         best_line = None
 
         vp2 = self._info.vanishing_points[1]
+
+        test_image = np.zeros(shape=(self._info.height, self._info.width))
+
+        for point in self._stop_places:
+            cv2.circle(test_image, point.tuple(), radius=5, color=255, thickness=5)
+
+        cv2.imwrite("stopky.png", test_image)
 
         for point2 in self._stop_places:
             try:

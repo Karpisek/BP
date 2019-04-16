@@ -2,6 +2,7 @@ import numpy as np
 
 import params
 from pipeline import ThreadedPipeBlock, is_frequency
+from pipeline.base.pipeline import Mode
 from repositories.traffic_light_repository import Color
 
 
@@ -19,14 +20,25 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         self._state_candidate = None
         self._state_candidate_count = 0
 
+    def _mode_changed(self, new_mode):
+        if new_mode == Mode.DETECTION:
+            self._state = None
+            self._state_values = [0, 0, 0]
+
+            self._state_candidate = None
+            self._state_candidate_count = 0
+
     def _step(self, seq):
         loader_seq, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
 
-        if is_frequency(seq, params.OBSERVER_FREQUENCY):
-            new_status = self.status(image=new_frame)
+        new_status = self.status(image=new_frame)
+        message = seq, new_status
 
-            message = seq, new_status
+        if is_frequency(seq, params.OBSERVER_FREQUENCY):
             self.send(message, pipe_id=params.OBSERVER_ID)
+
+        if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+            self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
     def status(self, image):
         if self._info.traffic_lights_repository.size == 0:
