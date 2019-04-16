@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-from munkres import Munkres
 
 import params
+from bbox.size import ObjectSize
 from bbox.coordinates import Coordinates
 from pc_lines.line import Line, SamePointError, NotOnLineError
 
@@ -65,15 +65,25 @@ class TrackedObjectsRepository:
     def lifelines(self):
         return self._lifelines
 
-    def new_tracked_object(self, coordinates, size, confident_score):
+    def new_tracked_object(self, coordinates, size, confident_score, _):
+
         new_object = TrackedObject(coordinates=coordinates,
                                    size=size,
                                    confident_score=confident_score,
                                    info=self._info,
                                    object_id=self._id_counter)
 
-        self._tracked_objects.append(new_object)
-        self._id_counter += 1
+        collision = False
+        for index, tracked_object in enumerate(self._tracked_objects[:]):
+            if tracked_object.overlap(new_object) > 0.1:
+                new_object.id = tracked_object.id
+                self._tracked_objects[index] = new_object
+                collision = True
+                break
+
+        if not collision:
+            self._tracked_objects.append(new_object)
+            self._id_counter += 1
 
     def count(self) -> int:
         return len(self._tracked_objects)
@@ -94,45 +104,24 @@ class TrackedObjectsRepository:
 
     def predict(self) -> None:
         for tracked_object in self._tracked_objects:
-            new_lifeline = tracked_object.predict()
-
-            if new_lifeline is not None:
-                self._lifelines.append(new_lifeline)
+            tracked_object.predict()
 
     def control_boxes(self) -> None:
 
         for tracked_object in self._tracked_objects:
-            if not self._info.update_area.contains(tracked_object.center):
-
-                if tracked_object.lifetime > 0:
-                    if tracked_object.history.y > tracked_object.center.y:
-                        self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+            if not self._info.update_area.contains(tracked_object.tracker_point):
+                if tracked_object.history.y > tracked_object.center.y:
+                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
 
                 self._tracked_objects.remove(tracked_object)
-
-        # self._suppression()
 
     def serialize(self):
         return [tracked_object.serialize() for tracked_object in self._tracked_objects]
 
-    # def _suppression(self):
-    #     area_size = "outer"
-    #
-    #     global_mask = self.all_boxes_mask(area_size=area_size)
-    #
-    #     for index, tracked_object in enumerate(self._tracked_objects[::-1]):
-    #         color = index + 1
-    #         ideal_content_size = tracked_object.size.height * tracked_object.size.width
-    #
-    #         left_anchor, right_anchor, _ = tracked_object.anchors()
-    #         object_mask = global_mask[left_anchor[0]: right_anchor[0], left_anchor[1]:right_anchor[1]]
-    #
-    #         no_overlap_content_size = len(np.where(object_mask.reshape(-1) <= color)[0])
-    #
-    #         print(no_overlap_content_size / ideal_content_size)
-    #         if no_overlap_content_size / ideal_content_size < params.TRACKER_SUPPRESSION_MIN:
-    #             self._tracked_objects.remove(tracked_object)
-    #             print("here")
+    def restart(self):
+        self._id_counter = 0
+        self._lifelines = []
+        self._tracked_objects = []
 
 
 class TrackedObject:
@@ -153,7 +142,6 @@ class TrackedObject:
                 except SamePointError:
                     continue
                 except NotOnLineError:
-                    print(p1, p2)
                     raise
 
         return image
@@ -203,7 +191,9 @@ class TrackedObject:
         super().__init__()
 
         self._id = object_id
-        self._object_size = size
+
+        self._reference_object_size = self._current_size = size
+        self._reference_coordinates = coordinates
 
         self.score = confident_score
 
@@ -232,8 +222,16 @@ class TrackedObject:
         return self._start_coordinates
 
     @property
+    def tracker_point(self):
+        return Coordinates(x=self.center.x, y=int(self.center.y + self.size.height/2))
+
+    @property
     def id(self) -> int:
         return self._id
+
+    @id.setter
+    def id(self, value):
+        self._id = value
 
     @property
     def center(self):
@@ -241,25 +239,39 @@ class TrackedObject:
 
     @property
     def size(self) -> (int, int):
-        return self._object_size
+        return self._current_size
 
     @property
     def velocity(self) -> (int, int):
         return int(np.abs(self._kalman.statePost[2][0])), int(np.abs(self._kalman.statePost[3][0]))
 
     @property
-    def left_anchor(self) -> (int, int):
-        x_min = int((self.center.x - self.size.width / 2))
-        y_min = int((self.center.y - self.size.height / 2))
+    def left_top_anchor(self):
+        x = int((self.center.x - self.size.width / 2))
+        y = int((self.center.y - self.size.height / 2))
 
-        return x_min, y_min
+        return Coordinates(x, y)
 
     @property
-    def right_anchor(self) -> (int, int):
-        x_max = int((self.center.x + self.size.width / 2))
-        y_max = int((self.center.y + self.size.height / 2))
+    def left_bot_anchor(self):
+        x = int((self.center.x - self.size.width / 2))
+        y = int((self.center.y + self.size.height / 2))
 
-        return x_max, y_max
+        return Coordinates(x, y)
+
+    @property
+    def right_top_anchor(self):
+        x = int((self.center.x + self.size.width / 2))
+        y = int((self.center.y - self.size.height / 2))
+
+        return Coordinates(x, y)
+
+    @property
+    def right_bot_anchor(self):
+        x = int((self.center.x + self.size.width / 2))
+        y = int((self.center.y + self.size.height / 2))
+
+        return Coordinates(x, y)
 
     @property
     def car_info(self) -> str:
@@ -268,6 +280,31 @@ class TrackedObject:
     @property
     def radius(self):
         return int(np.sqrt(self.size.width * self.size.width + self.size.height * self.size.height) / 2)
+
+    def overlap(self, overlapping_object):
+
+        x_min = np.max((self.left_top_anchor.x, overlapping_object.left_top_anchor.x))
+        y_min = np.max((self.left_top_anchor.y, overlapping_object.left_top_anchor.y))
+        x_max = np.min((self.right_bot_anchor.x, overlapping_object.right_bot_anchor.x))
+        y_max = np.min((self.right_bot_anchor.y, overlapping_object.right_bot_anchor.y))
+
+        image = np.zeros(shape=(self._info.height, self._info.width))
+
+        cv2.rectangle(image, (x_min, y_min), (x_max, y_max), 200, 2)
+
+        x_size = (x_max - x_min)
+        y_size = (y_max - y_min)
+
+        # no overlapping
+        if x_size < 0 or y_size < 0:
+            return 0
+
+        overlapped_square_size = x_size * y_size
+
+        return overlapped_square_size / self.square_size()
+
+    def square_size(self):
+        return self.size.width * self.size.height
 
     def area(self, area_size) -> int:
         if area_size == "inner":
@@ -283,7 +320,7 @@ class TrackedObject:
             return 0
 
     def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
-        return self.left_anchor, self.right_anchor, self.center.tuple()
+        return self.left_top_anchor.tuple(), self.right_bot_anchor.tuple(), self.center.tuple()
 
     def predict(self) -> ((float, float), (float, float)) or None:
         self._kalman.predict()
@@ -292,6 +329,18 @@ class TrackedObject:
         if self.center.y < self.history.y:
             if self.lifetime == 0:
                 return self.history.tuple(), self.center.tuple()
+
+        if self._info.calibrated:
+            vp1 = self._info.vanishing_points[0]
+            dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
+
+            current_width = self._reference_object_size.width * dist_diff
+            current_height = self._reference_object_size.height * dist_diff
+
+            self._current_size = ObjectSize(current_width, current_height)
+
+        else:
+            self._current_size = self._reference_object_size
 
     def update_position(self, size, score, new_coordinates) -> None:
         mesurement = np.array([
@@ -305,7 +354,9 @@ class TrackedObject:
         self._kalman.correct(mesurement)
 
         self.score = score
-        self._object_size = size
+
+        self._reference_object_size = size
+        self._reference_coordinates = new_coordinates
 
     def update_flow(self, old_positions, new_positions) -> None:
         x_flow, y_flow = self.extract_flow(old_positions, new_positions)
@@ -320,14 +371,16 @@ class TrackedObject:
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
 
-    def in_radius(self, new_coordinates) -> int:
+    def in_area(self, new_coordinates):
+        return self.left_top_anchor.x < new_coordinates.x < self.right_bot_anchor.x and self.left_top_anchor.y < new_coordinates.y < self.right_bot_anchor.y
 
+    def in_radius(self, new_coordinates) -> int:
         width = self.size.width
         height = self.size.height
 
         diagonal = np.sqrt(width * width + height * height)
 
-        max_pixels = diagonal/2
+        max_pixels = diagonal / 2
 
         return self.center.distance(new_coordinates) < max_pixels
 
@@ -340,7 +393,7 @@ class TrackedObject:
         for flow in zip(new_positions, old_positions):
             new_pos, old_pos = flow
 
-            if self.in_radius(Coordinates(*new_pos)):
+            if self.in_area(Coordinates(*new_pos)):
 
                 new_x, new_y = new_pos
                 old_x, old_y = old_pos

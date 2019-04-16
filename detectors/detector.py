@@ -2,15 +2,18 @@ import tensorflow as tf
 import numpy as np
 import params
 
-from bbox import TrackedObject, ObjectSize, Coordinates
+from bbox import ObjectSize, Coordinates
 from pipeline import ThreadedPipeBlock
 
 
 class Detector(ThreadedPipeBlock):
 
-    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True):
+    def _mode_changed(self, new_mode):
+        pass
 
-        super().__init__(pipe_id=detector_type_id, output=output)
+    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True, max_steps=np.inf):
+
+        super().__init__(pipe_id=detector_type_id, output=output, max_steps=max_steps)
         self._info = info
         self.detection_graph = tf.Graph()
         self._block = block
@@ -35,27 +38,32 @@ class Detector(ThreadedPipeBlock):
         seq, image = self.receive(params.FRAME_LOADER_ID)
         img_expanded = np.expand_dims(image, axis=0)
 
-        (boxes, scores, _, _) = self.sess.run(
+        (boxes, scores, classes, _) = self.sess.run(
             [self.d_boxes, self.d_scores, self.d_classes, self.num_d],
             feed_dict={self.image_tensor: img_expanded})
 
-        packet_boxes = self.parse_boxes(boxes[0], scores[0])
+        packet_boxes = self.parse_boxes(boxes[0], scores[0], classes[0])
 
-        self.send(packet_boxes, pipe_id=list(self._output.keys())[0], block=self._block)
+        if len(self._output):
+            self.send(packet_boxes, pipe_id=list(self._output.keys())[0], block=self._block)
 
-    def parse_boxes(self, boxes, scores) -> [(Coordinates, ObjectSize, float)]:
+    def parse_boxes(self, boxes, scores, classes) -> [(Coordinates, ObjectSize, float)]:
 
         final_boxes = []
-        for _, pair in enumerate(zip(boxes, scores)):
-            box, score = pair
+        for _, squad in enumerate(zip(boxes, scores, classes)):
+            box, score, class_id = squad
 
             if score < params.DETECTOR_MINIMAL_SCORE:
                 break
 
-            center, size = self.convert_box_to_centroid_object(box)
-            new_box = (center, size, score)
+            if class_id not in params.DETECTOR_CAR_CLASSES_IDS:
+                continue
 
-            final_boxes.append(new_box)
+            center, size = self.convert_box_to_centroid_object(box)
+
+            if size.square_size < 0.1:
+                new_box = (center, size, score, class_id)
+                final_boxes.append(new_box)
 
         return final_boxes
 

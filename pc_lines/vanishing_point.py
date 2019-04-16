@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 
 import params
@@ -14,11 +13,8 @@ class VanishingPoint:
     def __init__(self, point=None, direction=None):
 
         print("VP:", point)
-
         if point is None and direction is None:
             raise VanishingPointError
-
-
 
         # in case vanishing point is defined
         if point is not None:
@@ -32,25 +28,19 @@ class VanishingPoint:
             self._direction = direction
 
     @property
-    def coordinates(self):
-        if self._point is not None:
-            return Coordinates(self._point[0], self._point[1])
-        else:
-            raise VanishingPointError
-
-    @property
     def point(self):
-        if self._point is not None:
+        if not self.infinity:
             return self._point
         else:
             raise VanishingPointError
 
     @property
+    def coordinates(self):
+        return Coordinates(*self.point)
+
+    @property
     def direction(self):
-        if self._direction is not None:
-            return self._direction
-        else:
-            raise VanishingPointError
+        return self._direction
 
     def draw_line(self, image, point, color, thickness):
         if self.infinity:

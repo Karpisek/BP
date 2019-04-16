@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 
+
 class SamePointError(Exception):
     pass
 
@@ -13,7 +14,55 @@ class NotOnLineError(Exception):
     pass
 
 
+def ransac(creator_points, voting_points, ransac_threshold):
+    best_line_voters = 0
+    best_line_average_distance = np.inf
+    best_line = None
+
+    print(len(creator_points))
+    print(len(voting_points))
+    print("threshold: ", ransac_threshold)
+
+    for point1 in creator_points:
+        for point2 in creator_points:
+            try:
+                line = Line(point1, point2)
+            except SamePointError:
+                continue
+
+            accepted_points = 0
+            sum_distance = 0
+            for point in voting_points:
+                distance = line.point_distance(point)
+
+                if distance < ransac_threshold:
+                    accepted_points += 1
+                    sum_distance += distance
+
+            if accepted_points >= best_line_voters and accepted_points != 0:
+
+                distance_avg = sum_distance / accepted_points
+                if accepted_points > best_line_voters or distance_avg < best_line_average_distance:
+                    best_line_voters = accepted_points
+                    best_line_average_distance = distance_avg
+                    best_line = line
+
+    return best_line, best_line_voters
+
+
+class LineDrawError(Exception):
+    pass
+
+
+class LineNotOnImageError(Exception):
+    pass
+
+
 class Line:
+    @staticmethod
+    def horizontal_line():
+        return Line((1, 0), (0, 0))
+
     def __init__(self, point1, point2=None, direction=None):
 
         if point1 == point2:
@@ -133,18 +182,44 @@ class Line:
 
         if x is not None:
             if self.b == 0:
-                return -self.c/self.a, x
+                raise NotOnLineError
             return x, ((-self.a) * x - self.c) / self.b
         else:
             if self.a == 0:
-                return x, -self.c/self.b
+                raise NotOnLineError
             return ((-self.b) * y - self.c) / self.a, y
 
-    def draw(self, image, color, thickness) -> None:
-        h, _, _ = image.shape
+    def edge_points(self, info):
+        edge_points = []
+        edge_coordinates = [(None, 0), (0, None), (None, info.height - 1), (info.width - 1, None)]
 
-        p1 = [int(cord) for cord in self.find_coordinate(y=0)]
-        p2 = [int(cord) for cord in self.find_coordinate(y=h)]
+        for coordinate in edge_coordinates:
+            try:
+                new_point = ([int(cord) for cord in self.find_coordinate(*coordinate)])
+
+                if 0 <= new_point[0] < info.width and 0 <= new_point[1] < info.height:
+                    edge_points.append(new_point)
+
+            except NotOnLineError:
+                continue
+
+        return edge_points
+
+    def draw(self, image, color, thickness) -> None:
+        if len(image.shape) == 3:
+            h, w, _ = image.shape
+        elif len(image.shape) == 2:
+            h, w = image.shape
+        else:
+            raise LineDrawError
+
+        try:
+            p1 = [int(cord) for cord in self.find_coordinate(y=0)]
+            p2 = [int(cord) for cord in self.find_coordinate(y=h)]
+
+        except NotOnLineError:
+            p1 = [int(cord) for cord in self.find_coordinate(x=0)]
+            p2 = [int(cord) for cord in self.find_coordinate(x=w)]
 
         cv2.line(image, tuple(p1), tuple(p2), color, thickness)
 

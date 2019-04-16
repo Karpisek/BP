@@ -1,15 +1,16 @@
-import time
 import cv2
 import params
 
-from bbox import TrackedObject
 from pipeline import PipeBlock
-from pipeline.pipeline import is_frequency
+
+
+class UserEndException(Exception):
+    pass
 
 
 class VideoPlayer(PipeBlock):
-    def __init__(self, info):
-        super().__init__(pipe_id=params.VIDEO_PLAYER_ID)
+    def __init__(self, info, print_fps):
+        super().__init__(pipe_id=params.VIDEO_PLAYER_ID, print_fps=print_fps)
 
         self._detector = None
         self._loader = None
@@ -17,55 +18,33 @@ class VideoPlayer(PipeBlock):
 
         self._info = info
 
-    def start(self):
+    def _mode_changed(self, new_mode):
+        pass
 
-        cv2.namedWindow("image")
+    def _before(self):
+        pass
 
-        clock = time.time()
-        frame_counter = 0
+    def _step(self, seq):
 
-        seq, image = self.receive(params.FRAME_LOADER_ID)
-        frame_counter += 1
+        loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
 
-        while True:
-            tracker_seq, boxes, lifelines = self.receive(pipe_id=params.TRACKER_ID)
+        image = boxes_repository.draw(image)
 
-            image = TrackedObject.draw(image, boxes)
+        # image = self._info.draw_vanishing_points(image)
 
-            self._info.draw_vanishing_points(image)
+        image = self._info.draw_corridors(image)
+        image = self._info.draw_detected_traffic_lights(image)
 
-            image_with_corridors = self._info.draw_corridors(image)
-            # image_with_corridors = image
+        self._info.draw_syntetic_traffic_lights(image, lights_state)
 
-            image_calibrator = None
-            if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
-                image_calibrator = self.receive(pipe_id=params.CALIBRATOR_ID, block=False)
+        cv2.imshow("image", image)
 
-            if image_calibrator is not None:
-                cv2.imshow("image", image_calibrator)
-            else:
-                cv2.imshow("image", image_with_corridors)
+        key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 
-            key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
+        #  commands
+        if key & 0xFF == ord("q"):
+            raise EOFError
 
-            #  commands
-            if key & 0xFF == ord("q"):
-                break
-
-            elif key & 0xFF == ord("d"):
-                self._info.track_boxes = not self._info.track_boxes
-
-            if frame_counter > 100:
-                print("FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000), self, self._detector, self._loader, self._tracker)
-
-                frame_counter = 0
-                clock = time.time()
-
-            seq, image = self.receive(params.FRAME_LOADER_ID)
-            frame_counter += 1
-
+    def _after(self):
         cv2.destroyAllWindows()
-
-
-
-
