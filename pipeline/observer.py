@@ -113,6 +113,9 @@ class Box2D:
                     color=params.COLOR_BLACK,
                     thickness=2)
 
+    def __str__(self):
+        return f"[Box id: {self._car_id}]"
+
 
 class BBoxRepository:
     def __init__(self):
@@ -175,10 +178,11 @@ class Observer(ThreadedPipeBlock):
 
         self._bounding_boxes_repository.check_lifetime()
 
-        if self._previous_lights_state == Color.RED and current_lights_state == Color.RED_ORANGE:
+        if self._previous_lights_state == Color.RED_ORANGE and current_lights_state == Color.GREEN:
             if not self._info.corridors_repository.stopline_found:
                 boxes_in_corridors = self._bounding_boxes_repository.get_boxes_in_corridors(info=self._info)
 
+                print(boxes_in_corridors)
                 for corridors in boxes_in_corridors.values():
                     try:
                         first_car = corridors[0]

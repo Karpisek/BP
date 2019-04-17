@@ -330,7 +330,7 @@ class TrackedObject:
             if self.lifetime == 0:
                 return self.history.tuple(), self.center.tuple()
 
-        if self._info.calibrated:
+        if self._info.vp1 is not None:
             vp1 = self._info.vanishing_points[0]
             dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
 
@@ -342,7 +342,7 @@ class TrackedObject:
         else:
             self._current_size = self._reference_object_size
 
-    def update_position(self, size, score, new_coordinates) -> None:
+    def update_position(self, size, score, new_coordinates):
         mesurement = np.array([
             [np.float32(new_coordinates.x)],
             [np.float32(new_coordinates.y)],

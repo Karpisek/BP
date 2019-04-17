@@ -3,7 +3,6 @@ import numpy as np
 
 import params
 from pc_lines.line import Line, SamePointError
-from pc_lines.pc_line import PcLines
 from pc_lines.vanishing_point import VanishingPoint
 
 
@@ -98,7 +97,7 @@ class TrafficCorridorRepository:
             return -1
 
         if 0 < coordinates.x < self._info.width and 0 < coordinates.y < self._info.height:
-            return self._corridor_mask[int(coordinates.y)][int(coordinates.x)] - 1
+            return self._corridor_mask[int(coordinates.y)][int(coordinates.x)]
         else:
             return -1
 
