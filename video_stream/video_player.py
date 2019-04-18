@@ -31,7 +31,7 @@ class VideoPlayer(PipeBlock):
 
         image = boxes_repository.draw(image)
 
-        # image = self._info.draw_vanishing_points(image)
+        image = self._info.draw_vanishing_points(image)
 
         image = self._info.draw_corridors(image)
         image = self._info.draw_detected_traffic_lights(image)
