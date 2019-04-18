@@ -49,8 +49,8 @@ class TrafficLightsRepository(Repository):
     def size(self):
         return len(self._traffic_lights)
 
-    def state(self, image):
-        return self._traffic_lights[0].state_counts(image)
+    def state(self, current_frame, previous_frame):
+        return self._traffic_lights[0].state_counts(current_frame, previous_frame)
 
     def select_manually(self, image):
         rectangle = cv2.selectROI("select_traffic_light", image, showCrosshair=True)
@@ -99,16 +99,20 @@ class TrafficLight:
         self._top_left = top_left.tuple()
         self._bottom_right = bottom_right.tuple()
 
-    def state_counts(self, image):
-        light_roi = image[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
+    def state_counts(self, current_frame, previous_frame):
+        current_light = current_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
+        previous_light = previous_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
 
-        smoothed_light_roi = cv2.medianBlur(light_roi, 5)
+        smoothed_current_light = cv2.blur(current_light, (5, 5))
+        smoothed_previous_light = cv2.blur(previous_light, (5, 5))
 
-        hsv_image = cv2.cvtColor(smoothed_light_roi, cv2.COLOR_BGR2HSV)
+        combined_image = cv2.max(smoothed_current_light, smoothed_previous_light)
+
+        hsv_image = cv2.cvtColor(combined_image, cv2.COLOR_BGR2HSV)
 
         low_red_mask = cv2.inRange(hsv_image, (0, 100, 20), (5, 255, 255))
         up_red_mask = cv2.inRange(hsv_image, (160, 100, 20), (180, 255, 255))
-        orange_mask = cv2.inRange(hsv_image, (10, 100, 20), (25, 255, 255))
+        orange_mask = cv2.inRange(hsv_image, (5, 100, 20), (25, 255, 255))
         green_mask = cv2.inRange(hsv_image, (30, 100, 20), (90, 255, 255))
 
         red_mask = np.maximum(low_red_mask, up_red_mask)

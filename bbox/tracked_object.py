@@ -191,6 +191,7 @@ class TrackedObject:
         super().__init__()
 
         self._id = object_id
+        self._velocity = 0
 
         self._reference_object_size = self._current_size = size
         self._reference_coordinates = coordinates
@@ -242,8 +243,8 @@ class TrackedObject:
         return self._current_size
 
     @property
-    def velocity(self) -> (int, int):
-        return int(np.abs(self._kalman.statePost[2][0])), int(np.abs(self._kalman.statePost[3][0]))
+    def velocity(self) -> int:
+        return int(self._velocity)
 
     @property
     def left_top_anchor(self):
@@ -330,7 +331,7 @@ class TrackedObject:
             if self.lifetime == 0:
                 return self.history.tuple(), self.center.tuple()
 
-        if self._info.calibrated:
+        if self._info.vp1 is not None:
             vp1 = self._info.vanishing_points[0]
             dist_diff = self.center.distance(vp1.coordinates) / self._reference_coordinates.distance(vp1.coordinates)
 
@@ -342,7 +343,7 @@ class TrackedObject:
         else:
             self._current_size = self._reference_object_size
 
-    def update_position(self, size, score, new_coordinates) -> None:
+    def update_position(self, size, score, new_coordinates):
         mesurement = np.array([
             [np.float32(new_coordinates.x)],
             [np.float32(new_coordinates.y)],
@@ -368,6 +369,7 @@ class TrackedObject:
             [np.float32(y_flow/params.TRACKER_OPTICAL_FLOW_FREQUENCY)]
         ])
 
+        self._velocity = np.sqrt(x_flow ** 2 + y_flow ** 2)
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
 
@@ -421,7 +423,7 @@ class TrackedObject:
         return mask
 
     def serialize(self):
-        return self.anchors(), self.area(area_size="outer"), self.car_info
+        return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
 
     def __del__(self):
         pass

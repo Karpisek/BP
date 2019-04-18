@@ -14,6 +14,7 @@ class Box2D:
         self._top_left = None
         self._bottom_right = None
         self._car_id = car_id
+        self._red_distance_traveled = 0
 
         self._red_rider = False
         self._red_stander = False
@@ -58,7 +59,7 @@ class Box2D:
     def tic(self):
         self._lifetime -= 1
 
-    def update(self, anchors, lights_state, info):
+    def update(self, anchors, lights_state, info, velocity):
         previous_coordinates = None
 
         if self.initialized:
@@ -78,6 +79,12 @@ class Box2D:
             if lights_state == Color.ORANGE:
                 if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
                     self._orange_rider = True
+
+        if self._red_stander:
+            self._red_distance_traveled += velocity
+
+        if self._red_distance_traveled > params.OBSERVER_RED_STANDER_MAX_TRAVEL:
+            self._red_rider = True
 
     def draw(self, image):
         if self._red_rider:
@@ -113,6 +120,9 @@ class Box2D:
                     color=params.COLOR_BLACK,
                     thickness=2)
 
+    def __str__(self):
+        return f"[Box id: {self._car_id}]"
+
 
 class BBoxRepository:
     def __init__(self):
@@ -128,11 +138,11 @@ class BBoxRepository:
 
         return {corridor: [box for box in sorted_boxes if box.get_corridor(info) == corridor]for corridor in corridor_ids}
 
-    def insert_or_update(self, anchors, car_id, lights_state, info):
+    def insert_or_update(self, anchors, car_id, velocity, lights_state, info):
         if car_id not in self._boxes:
             self._boxes[car_id] = Box2D(car_id)
 
-        self._boxes[car_id].update(anchors, lights_state, info)
+        self._boxes[car_id].update(anchors, lights_state, info, velocity)
 
     def check_lifetime(self):
         for key, box in self._boxes.copy().items():
@@ -170,15 +180,16 @@ class Observer(ThreadedPipeBlock):
         lights_seq, current_lights_state = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
 
         for tracked_object in tracked_objects:
-            anchors, _, car_info = tracked_object
-            self._bounding_boxes_repository.insert_or_update(anchors, car_info, current_lights_state, self._info)
+            anchors, _, car_info, car_velocity = tracked_object
+            self._bounding_boxes_repository.insert_or_update(anchors, car_info, car_velocity, current_lights_state, self._info)
 
         self._bounding_boxes_repository.check_lifetime()
 
-        if self._previous_lights_state == Color.RED and current_lights_state == Color.RED_ORANGE:
+        if self._previous_lights_state == Color.RED_ORANGE and current_lights_state == Color.GREEN:
             if not self._info.corridors_repository.stopline_found:
                 boxes_in_corridors = self._bounding_boxes_repository.get_boxes_in_corridors(info=self._info)
 
+                print(boxes_in_corridors)
                 for corridors in boxes_in_corridors.values():
                     try:
                         first_car = corridors[0]
