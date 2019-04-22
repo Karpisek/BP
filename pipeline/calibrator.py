@@ -28,7 +28,7 @@ class Calibrator(ThreadedPipeBlock):
 
     def _mode_changed(self, new_mode):
         if new_mode == Mode.DETECTION:
-            self._end_block()
+            raise EOFError
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
@@ -64,7 +64,8 @@ class Calibrator(ThreadedPipeBlock):
             return
 
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
-        blured = cv2.blur(selected_areas, (3, 3))
+        # blured = cv2.blur(selected_areas, (3, 3))
+        blured = cv2.GaussianBlur(selected_areas, (7, 7), 0)
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
         no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
@@ -77,7 +78,8 @@ class Calibrator(ThreadedPipeBlock):
 
         vp1 = self._info.vanishing_points[0]
 
-        detected_lines = []
+        canny = cv2.cvtColor(canny, cv2.COLOR_GRAY2RGB)
+
         if lines is not None:
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
@@ -93,24 +95,12 @@ class Calibrator(ThreadedPipeBlock):
                         cv2.line(selected_areas, point1, point2, params.COLOR_WHITE, 1)
                         continue
 
-                    detected_lines.append(Line(point1, point2))
                     self._pc_lines.add_to_pc_space(point1, point2)
-                    cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
+                    cv2.line(canny, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
 
-        # if detected_lines:
-        #     best_lines = sorted(detected_lines, key=lambda l: l.magnitude, reverse=True)
-        #
-        #     line_count = 0
-        #     for line in best_lines:
-        #         line_count += 1
-        #         if line_count > 2:
-        #             break
-        #
-        #         self._pc_lines.add_to_pc_space(line=line)
-        #         line.draw(selected_areas, color=params.COLOR_BLUE, thickness=params.DEFAULT_THICKNESS)
-
+        print(self._pc_lines.count)
         if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_lines_cross()
 
@@ -125,7 +115,7 @@ class Calibrator(ThreadedPipeBlock):
 
             self._pc_lines.clear()
 
-        cv2.imwrite("test.jpg", selected_areas)
+        cv2.imwrite("test.jpg", canny)
 
     def calculate_third_vp(self):
         vp1 = self._info.vanishing_points[0].point

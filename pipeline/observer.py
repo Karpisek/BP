@@ -1,12 +1,21 @@
 from copy import deepcopy
+from enum import Enum
 
 import cv2
 
 import params
+import numpy as np
 from detectors import Coordinates
 from pipeline import ThreadedPipeBlock, is_frequency
 from pipeline.base.pipeline import Mode
 from pipeline.traffic_light_observer import Color
+
+
+class CarBehaviourMode(Enum):
+    NORMAL = 1
+    LINE_CROSSED = 2
+    RED_DRIVER = 3
+    ORANGE_DRIVER = 4
 
 
 class Box2D:
@@ -16,9 +25,7 @@ class Box2D:
         self._car_id = car_id
         self._red_distance_traveled = 0
 
-        self._red_rider = False
-        self._red_stander = False
-        self._orange_rider = False
+        self._behaviour = CarBehaviourMode.NORMAL
 
         self._lifetime = 1
 
@@ -29,10 +36,6 @@ class Box2D:
     @property
     def initialized(self):
         return self._top_left is not None
-
-    @property
-    def red_rider(self):
-        return self._red_rider
 
     @property
     def lifetime(self):
@@ -71,25 +74,28 @@ class Box2D:
         if previous_coordinates is not None:
             if lights_state == Color.RED or lights_state == Color.RED_ORANGE:
                 if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
-                    self._red_rider = True
+                    self._behaviour = CarBehaviourMode.RED_DRIVER
 
-                if info.corridors_repository.behind_line(self.tracker_point):
-                    self._red_stander = True
+                if self._behaviour == CarBehaviourMode.LINE_CROSSED:
+                    self._red_distance_traveled += velocity
 
             if lights_state == Color.ORANGE:
                 if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
-                    self._orange_rider = True
+                    self._behaviour = CarBehaviourMode.ORANGE_DRIVER
 
-        if self._red_stander:
-            self._red_distance_traveled += velocity
+            if lights_state == Color.GREEN and self._behaviour not in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER]:
+                if info.corridors_repository.behind_line(self.tracker_point):
+                    self._behaviour = CarBehaviourMode.LINE_CROSSED
 
         if self._red_distance_traveled > params.OBSERVER_RED_STANDER_MAX_TRAVEL:
-            self._red_rider = True
+            self._behaviour = CarBehaviourMode.RED_DRIVER
+
+        return self._behaviour
 
     def draw(self, image):
-        if self._red_rider:
+        if self._behaviour == CarBehaviourMode.RED_DRIVER:
             color = params.COLOR_RED
-        elif self._orange_rider:
+        elif self._behaviour == CarBehaviourMode.ORANGE_DRIVER:
             color = params.COLOR_ORANGE
         else:
             color = params.COLOR_GREEN
@@ -127,7 +133,21 @@ class Box2D:
 class BBoxRepository:
     def __init__(self):
         self._boxes = {}
-        self._red_riders_count = 0
+        self._red_riders = []
+        self._orange_riders = []
+        self._all_cars = []
+
+    @property
+    def car_count(self):
+        return len(self._all_cars)
+
+    @property
+    def red_drivers_count(self):
+        return len(self._red_riders)
+
+    @property
+    def orange_drivers_count(self):
+        return len(self._orange_riders)
 
     def get_boxes_in_corridors(self, info):
         if info.vp1 is None or not info.corridors_repository.corridors_found:
@@ -142,7 +162,24 @@ class BBoxRepository:
         if car_id not in self._boxes:
             self._boxes[car_id] = Box2D(car_id)
 
-        self._boxes[car_id].update(anchors, lights_state, info, velocity)
+        behaviour = self._boxes[car_id].update(anchors, lights_state, info, velocity)
+
+        if behaviour in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER, CarBehaviourMode.LINE_CROSSED]:
+            if car_id not in self._all_cars:
+                self._all_cars.append(car_id)
+
+        if behaviour == CarBehaviourMode.RED_DRIVER:
+            try:
+                self._orange_riders.remove(car_id)
+            except ValueError:
+                pass
+
+            if car_id not in self._red_riders:
+                self._red_riders.append(car_id)
+
+        if behaviour == CarBehaviourMode.ORANGE_DRIVER:
+            if car_id not in self._orange_riders:
+                self._orange_riders.append(car_id)
 
     def check_lifetime(self):
         for key, box in self._boxes.copy().items():
@@ -156,9 +193,47 @@ class BBoxRepository:
 
         return image
 
+    def draw_statistics(self, image, info):
+        statistics_panel = np.full(shape=(30, info.width, 3),
+                                   dtype=np.uint8,
+                                   fill_value=params.COLOR_WHITE)
+
+        cv2.putText(img=statistics_panel,
+                    text=f"Total car count: {self.car_count}",
+                    org=(10, 20),
+                    fontFace=1,
+                    fontScale=1,
+                    color=params.COLOR_BLACK,
+                    thickness=1)
+
+        cv2.putText(img=statistics_panel,
+                    text=f"Red drivers: {self.red_drivers_count}",
+                    org=(300, 20),
+                    fontFace=1,
+                    fontScale=1,
+                    color=params.COLOR_BLACK,
+                    thickness=1)
+
+        cv2.putText(img=statistics_panel,
+                    text=f"Orange drivers: {self.orange_drivers_count}",
+                    org=(500, 20),
+                    fontFace=1,
+                    fontScale=1,
+                    color=params.COLOR_BLACK,
+                    thickness=1)
+
+        return np.concatenate((statistics_panel, image), axis=0)
+
+    def write_statistics(self, file):
+        file.write(f"Total cars: {self.car_count}\n")
+        file.write(f"Red drivers: {self.red_drivers_count}\n")
+        file.write(f"Orange drivers: {self.orange_drivers_count}\n")
+
     def restart(self):
         self._boxes = {}
-        self._red_riders_count = 0
+        self._red_riders = []
+        self._orange_riders = []
+        self._all_cars = []
 
 
 class Observer(ThreadedPipeBlock):
@@ -199,10 +274,10 @@ class Observer(ThreadedPipeBlock):
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
             message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+            self.send(message, pipe_id=params.VIDEO_PLAYER_ID, block=False)
 
-        # if is_frequency(seq, params.VIDEO_WRITER_FREQUENCY):
-        #     message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
-        #     self.send(message, pipe_id=params.VIDEO_WRITER_ID)
+        if is_frequency(seq, params.VIOLATION_WRITER_FREQUENCY):
+            message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
+            self.send(message, pipe_id=params.VIOLATION_WRITER_ID)
 
         self._previous_lights_state = current_lights_state

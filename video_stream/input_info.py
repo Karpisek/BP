@@ -12,12 +12,20 @@ class Info:
     def __init__(self, video_path, light_detection_model, program_arguments):
 
         self._input = cv2.VideoCapture(video_path)
+        filename_with_extension = video_path.rsplit('/', 1)[1]
+        self._file_name = filename_with_extension.rsplit('.', 1)[0]
 
         self._fps = self._input.get(cv2.CAP_PROP_FPS)
         self._height = self._input.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self._width = self._input.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self._resize = False
         self._frame_count = self._input.get(cv2.CAP_PROP_FRAME_COUNT)
         self._ratio = self._height / self._width
+
+        if self._width > params.FRAME_LOADER_MAX_WIDTH:
+            self._width = int(params.FRAME_LOADER_MAX_WIDTH)
+            self._height = int(params.FRAME_LOADER_MAX_WIDTH * self._ratio)
+            self._resize = True
 
         self._vanishing_points = []
         self._traffic_lights_repository = TrafficLightsRepository(model=light_detection_model, info=self)
@@ -53,6 +61,10 @@ class Info:
             print("Please select as accurate as possible rectangle containing traffic light")
 
             self._traffic_lights_repository.select_manually(image)
+
+    @property
+    def filename(self):
+        return self._file_name
 
     @property
     def vp1(self):
@@ -120,10 +132,12 @@ class Info:
         if not status:
             raise EOFError
 
-        if width is None:
-            return frame
-        else:
+        if width is not None:
             return cv2.resize(frame, (width, int(width * self.ratio)))
+        elif self._resize:
+            return cv2.resize(frame, (self._width, self._height))
+        else:
+            return frame
 
     def reopen(self):
         self._input.set(cv2.CAP_PROP_POS_FRAMES, 0)

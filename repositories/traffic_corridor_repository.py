@@ -3,7 +3,7 @@ import numpy as np
 
 import params
 from pc_lines.line import Line, SamePointError
-from pc_lines.vanishing_point import VanishingPoint
+from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
 
 
 def _mouse_callback(event, x, y, _, param):
@@ -210,7 +210,7 @@ class TrafficCorridorRepository:
 
         # cv2.imwrite("mask.jpg", self.get_mask())
         cv2.imwrite("lifeline.jpg", frame_edge)
-        cv2.imwrite("lifeline_before.jpg", edge_grey_blured)
+        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
         self._corridors_found = True
@@ -240,6 +240,8 @@ class TrafficCorridorRepository:
                 line = Line(vp2.point, point2.tuple())
             except SamePointError:
                 continue
+            except VanishingPointError:
+                line = Line(point1=point2.tuple(), direction=vp2.direction)
 
             num = 0
             ransac_threshold = params.CORRIDORS_RANSAC_THRESHOLD

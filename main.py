@@ -8,7 +8,7 @@ from pipeline import Tracker, Calibrator
 from detectors import Detector
 
 import params
-
+from video_stream.video_writer import ViolationWriter
 
 # VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/x.mov"
@@ -16,8 +16,8 @@ import params
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00002.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/v2.mp4"
 
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
-VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1a.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1b.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
@@ -43,11 +43,11 @@ def main(argv):
                       light_detection_model=PATH_TO_LIGHTS_MODEL,
                       program_arguments=program_arguments)
 
-    # video playback
-    video_player = VideoPlayer(info=video_info, print_fps=True)
-
     # video writer
-    # video_writer = VideoWriter(info=video_info)
+    video_writer = ViolationWriter(info=video_info)
+
+    # video playback
+    video_player = VideoPlayer(info=video_info, print_fps=True, output=[video_writer])
 
     # calibrator
     calibrator = Calibrator(info=video_info,
@@ -55,7 +55,8 @@ def main(argv):
 
     # observer
     observer = Observer(info=video_info,
-                        output=[video_player])
+                        output=[video_player,
+                                video_writer])
 
     # traffic light observer
     traffic_lights_observer = TrafficLightsObserver(info=video_info,
@@ -76,7 +77,8 @@ def main(argv):
                                        video_player,
                                        tracker,
                                        calibrator,
-                                       traffic_lights_observer])
+                                       traffic_lights_observer,
+                                       video_writer])
 
     frame_loader.start()
     car_detector.start()
@@ -84,6 +86,7 @@ def main(argv):
     tracker.start()
     calibrator.start()
     observer.start()
+    video_writer.start()
     traffic_lights_observer.start()
 
     video_player._loader = frame_loader
@@ -91,6 +94,7 @@ def main(argv):
     video_player._tracker = tracker
 
     video_player.start()
+    video_writer.join()
 
 
 if __name__ == '__main__':

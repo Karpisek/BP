@@ -54,6 +54,7 @@ class TrackedObjectsRepository:
     def __init__(self, info):
         self._id_counter = 0
         self._lifelines = []
+        self._collected_lifelines_id = []
         self._tracked_objects = []
         self._info = info
 
@@ -109,10 +110,12 @@ class TrackedObjectsRepository:
     def control_boxes(self) -> None:
 
         for tracked_object in self._tracked_objects:
-            if not self._info.update_area.contains(tracked_object.tracker_point):
-                if tracked_object.history.y > tracked_object.center.y:
-                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+            if tracked_object.id not in self._collected_lifelines_id and not self._info.start_area.contains(tracked_object.tracker_point):
+                if tracked_object.history.y > tracked_object.tracker_point.y:
+                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.tracker_point.tuple()))
+                    self._collected_lifelines_id.append(tracked_object.id)
 
+            if not self._info.update_area.contains(tracked_object.tracker_point):
                 self._tracked_objects.remove(tracked_object)
 
     def serialize(self):
@@ -216,7 +219,7 @@ class TrackedObject:
             [np.float32(0)],  # dy
         ])
 
-        self._start_coordinates = coordinates
+        self._start_coordinates = self.tracker_point
 
     @property
     def history(self):

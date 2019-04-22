@@ -24,6 +24,7 @@ class FrameLoader(ThreadedPipeBlock):
 
                 final_image = np.maximum(final_image, image)
 
+            cv2.imwrite("aha.jpg", final_image)
             self._info.traffic_lights_repository.find(image=final_image)
             self._info.reopen()
 
@@ -60,6 +61,9 @@ class FrameLoader(ThreadedPipeBlock):
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.DETECTOR_CAR_ID)
 
-        # if is_frequency(seq, params.VIDEO_WRITER_FREQUENCY):
-        #     message = (seq, np.copy(image))
-        #     self.send(message, pipe_id=params.VIDEO_WRITER_ID)
+        if is_frequency(seq, params.VIOLATION_WRITER_FREQUENCY):
+            message = (seq, np.copy(image))
+            self.send(message, pipe_id=params.VIOLATION_WRITER_ID)
+
+    def _after(self):
+        self.send(EOFError, pipe_id=params.VIDEO_PLAYER_ID)

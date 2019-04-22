@@ -1,4 +1,7 @@
+import shutil
+
 import cv2
+import os
 import params
 
 from pipeline import ThreadedPipeBlock
@@ -6,25 +9,36 @@ from pipeline import ThreadedPipeBlock
 
 class ViolationWriter(ThreadedPipeBlock):
 
-    def __init__(self, info):
-        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=params.VIOLATION_WRITER_WORKMODES)
-        self._info = info
+    def _mode_changed(self, new_mode):
+        pass
 
+    def __init__(self, info):
+        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=params.VIOLATION_WRITER_WORKMODES, deamon=False)
+        self._info = info
         self._video_writers = []
+        self._last_boxes_repository = None
+
+    def _before(self):
+        path = f"{os.getcwd()}/{self._info.filename}"
+
+        if os.path.exists(path):
+            shutil.rmtree(path)
+
+        os.makedirs(path)
 
     def _step(self, seq):
+        self.receive(pipe_id=params.VIDEO_PLAYER_ID)
+
         loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
         observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
+        self._last_boxes_repository = boxes_repository
 
+    def _after(self):
+        if self._last_boxes_repository is not None:
+            path = f"{os.getcwd()}/{self._info.filename}/statistics.log"
 
-
-
-
-
-
-
-
-
+            with open(path, "w") as file:
+                self._last_boxes_repository.write_statistics(file)
 
 
 # class VideoWriter(ThreadedPipeBlock):
