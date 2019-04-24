@@ -12,14 +12,15 @@ class ViolationWriter(ThreadedPipeBlock):
     def _mode_changed(self, new_mode):
         pass
 
-    def __init__(self, info):
+    def __init__(self, info, program_arguments):
         super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=params.VIOLATION_WRITER_WORKMODES, deamon=False)
         self._info = info
         self._video_writers = []
         self._last_boxes_repository = None
+        self._program_arguments = program_arguments
 
     def _before(self):
-        path = f"{os.getcwd()}/{self._info.filename}"
+        path = f"{self._program_arguments.output_dir}/{self._info.filename}"
 
         if os.path.exists(path):
             shutil.rmtree(path)
@@ -34,12 +35,21 @@ class ViolationWriter(ThreadedPipeBlock):
         self._last_boxes_repository = boxes_repository
 
     def _after(self):
+        self._write_statistics()
+        self._write_calibration()
+
+    def _write_statistics(self):
         if self._last_boxes_repository is not None:
-            path = f"{os.getcwd()}/{self._info.filename}/statistics.log"
+            path = f"{self._program_arguments.output_dir}/{self._info.filename}/{params.STATISTICS_LOG_FILENAME}"
 
             with open(path, "w") as file:
                 self._last_boxes_repository.write_statistics(file)
 
+    def _write_calibration(self):
+        path = f"{self._program_arguments.output_dir}/{self._info.filename}/{params.CALIBRATION_FILENAME}"
+
+        with open(path, "w") as file:
+            self._info.write_calibration(file)
 
 # class VideoWriter(ThreadedPipeBlock):
 #     def __init__(self, info, output_name='output'):

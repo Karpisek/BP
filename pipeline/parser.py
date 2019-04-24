@@ -42,7 +42,7 @@ class InputParser:
         return self._corridors
 
     @property
-    def input_dir(self):
+    def input_video(self):
         return self._input
 
     @property

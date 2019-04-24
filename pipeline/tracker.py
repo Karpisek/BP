@@ -73,7 +73,7 @@ class Tracker(ThreadedPipeBlock):
 
         else:
             for detected_object in detected_objects:
-                coordinates, size, confident_score, _ = detected_object
+                coordinates, size, confident_score, class_id = detected_object
 
                 if self._info.start_area.contains(coordinates):
                     self._tracked_object_repository.new_tracked_object(*detected_object)

@@ -93,6 +93,9 @@ class TrafficLightsRepository(Repository):
 
         return image
 
+    def serialize(self):
+        return {"traffic light": self._traffic_lights[0].serialize()}
+
 
 class TrafficLight:
     def __init__(self, top_left, bottom_right):
@@ -110,10 +113,10 @@ class TrafficLight:
 
         hsv_image = cv2.cvtColor(combined_image, cv2.COLOR_BGR2HSV)
 
-        low_red_mask = cv2.inRange(hsv_image, (0, 100, 20), (5, 255, 255))
-        up_red_mask = cv2.inRange(hsv_image, (160, 100, 20), (180, 255, 255))
-        orange_mask = cv2.inRange(hsv_image, (5, 100, 20), (25, 255, 255))
-        green_mask = cv2.inRange(hsv_image, (30, 100, 20), (90, 255, 255))
+        low_red_mask = cv2.inRange(hsv_image, (0, 100, 10), (5, 255, 255))
+        up_red_mask = cv2.inRange(hsv_image, (160, 100, 10), (180, 255, 255))
+        orange_mask = cv2.inRange(hsv_image, (5, 100, 10), (25, 255, 255))
+        green_mask = cv2.inRange(hsv_image, (30, 100, 10), (95, 255, 255))
 
         red_mask = np.maximum(low_red_mask, up_red_mask)
 
@@ -134,6 +137,9 @@ class TrafficLight:
                       pt2=self._bottom_right,
                       thickness=params.DEFAULT_THICKNESS,
                       color=params.COLOR_YELLOW)
+
+    def serialize(self):
+        return {"top left": list(self._top_left), "bottom right": list(self._bottom_right)}
 
 
 

@@ -162,8 +162,11 @@ class TrafficCorridorRepository:
         # greyscale image and reduce noise by multiple blur and threshold
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
-        edge_grey_blured = cv2.medianBlur(edge_grey, 21)
+        edge_grey_blured = cv2.medianBlur(edge_grey, 31)
         _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+
+        # edge_grey_blured = cv2.medianBlur(threshold, 21)
+        # _, threshold = cv2.threshold(edge_grey_blured, 10, 255, cv2.THRESH_BINARY)
 
         height, width = edge_grey_blured.shape
 
@@ -196,8 +199,10 @@ class TrafficCorridorRepository:
             for coordinate in list(point):
                 if coordinate < self._info.height:
                     points.append((0, coordinate))
+
                 elif coordinate < self._info.height + self._info.width:
                     points.append((coordinate - self._info.height, self._info.height - 1))
+
                 else:
                     points.append((self._info.width - 1, self._info.width + 2 * self._info.height - coordinate))
 
@@ -218,7 +223,7 @@ class TrafficCorridorRepository:
     def add_stop_point(self, coordinates):
         self._stop_places.append(coordinates)
 
-        if len(self._stop_places) > params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
+        if len(self._stop_places) >= params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
             self.find_stop_line()
 
     def find_stop_line(self):
@@ -257,6 +262,9 @@ class TrafficCorridorRepository:
 
         self._stop_line = best_line
         self._stopline_found = True
+
+    def serialize(self):
+        return {"corridors": "not implemented"}
 
 
 class TrafficCorridor:

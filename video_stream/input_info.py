@@ -1,3 +1,5 @@
+import json
+
 import cv2
 import numpy as np
 
@@ -209,4 +211,16 @@ class Info:
     def resize(self, width, height):
         self._width = width
         self._width = height
+
+    def write_calibration(self, file):
+        data = {"vanishing points": [vp.serialize() for vp in self.vanishing_points]}
+        data.update(self.traffic_lights_repository.serialize())
+        data.update(self.corridors_repository.serialize())
+
+        print(data)
+        json.dump(data, file)
+
+
+
+
 
