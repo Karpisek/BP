@@ -280,25 +280,33 @@ class TrafficCorridor:
         return self._id
 
     def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
-        mask = np.zeros(shape=(info.height, info.width),
-                        dtype=np.uint8)
-
         if color is None:
             color = self.id
 
-        self.left_line.draw(image, color, thickness)
-        self.left_line.draw(mask, color, thickness)
-
-        self.right_line.draw(image, color, thickness)
-        self.right_line.draw(mask, color, thickness)
-
         if fill:
+            mask = np.zeros(shape=(info.height, info.width),
+                            dtype=np.uint8)
+
+            self.left_line.draw(image, color, thickness)
+            self.left_line.draw(mask, color, thickness)
+
+            self.right_line.draw(image, color, thickness)
+            self.right_line.draw(mask, color, thickness)
+
             mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
 
             cv2.floodFill(image=image,
                           mask=mask_with_border,
                           seedPoint=self.middle_point,
                           newVal=color)
+        else:
+            self.left_line.draw(image=image,
+                                color=color,
+                                thickness=5)
+
+            self.right_line.draw(image=image,
+                                 color=color,
+                                 thickness=5)
 
     def __str__(self):
         return f"corridor: id [{self.id}]"

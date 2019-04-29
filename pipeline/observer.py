@@ -138,6 +138,18 @@ class BBoxRepository:
         self._all_cars = []
 
     @property
+    def boxes(self):
+        return self._boxes
+
+    @property
+    def red_riders(self):
+        return self._red_riders
+
+    @property
+    def orange_riders(self):
+        return self._orange_riders
+
+    @property
     def car_count(self):
         return len(self._all_cars)
 
@@ -192,6 +204,9 @@ class BBoxRepository:
             box.draw(image)
 
         return image
+
+    def get_box_by_id(self, car_id):
+        return self._boxes[car_id]
 
     def draw_statistics(self, image, info):
         statistics_panel = np.full(shape=(30, info.width, 3),

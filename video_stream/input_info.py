@@ -153,7 +153,6 @@ class Info:
 
         for i in range(len(self.vanishing_points)):
             for p in points:
-
                 self.vanishing_points[i].draw_line(image=image,
                                                    point=p,
                                                    color=params.COLOR_VANISHING_DIRECTIONS[i],
@@ -163,7 +162,15 @@ class Info:
 
     def draw_corridors(self, image) -> np.ndarray:
         corridor_mask = self.corridors_repository.get_mask(fill=True)
-        return cv2.add(image, corridor_mask)
+
+        # grayscale_mask = cv2.cvtColor(corridor_mask, cv2.COLOR_RGB2GRAY)
+        # _, thresholded_mask = cv2.threshold(grayscale_mask, 1, 255, cv2.THRESH_BINARY)
+        # mask = cv2.cvtColor(thresholded_mask, cv2.COLOR_GRAY2RGB)
+        #
+        # image = cv2.subtract(image, mask)
+        # image += corridor_mask
+
+        return cv2.add(corridor_mask, image)
 
     def draw_detected_traffic_lights(self, image) -> np.ndarray:
         return self.traffic_lights_repository.draw(image)

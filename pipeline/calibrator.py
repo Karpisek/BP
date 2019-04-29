@@ -115,7 +115,7 @@ class Calibrator(ThreadedPipeBlock):
                 self._info.vanishing_points.append(VanishingPoint(direction=direction))
 
             self._pc_lines.clear()
-    #
+
     # def calculate_third_vp(self):
     #     vp1 = self._info.vanishing_points[0].point
     #
@@ -131,9 +131,11 @@ class Calibrator(ThreadedPipeBlock):
     #     self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
 
     def find_corridors(self, lifelines):
+        filtered_lifelines = TrackedObject.filter_lifelines(lifelines, self._info.vp1)
+
         mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
         mask = TrackedObject.draw_lifelines(image=mask,
-                                            lifelines=lifelines,
+                                            lifelines=filtered_lifelines,
                                             color=params.COLOR_LIFELINE,
                                             thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
 

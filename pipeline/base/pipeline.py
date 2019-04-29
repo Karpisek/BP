@@ -130,7 +130,7 @@ class PipeBlock:
 
     @property
     def mode(self):
-        return self.mode
+        return self._mode
 
 
 class ThreadedPipeBlock(PipeBlock):

@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+import params
+
 
 class SamePointError(Exception):
     pass
@@ -220,6 +222,9 @@ class Line:
         except NotOnLineError:
             p1 = [int(cord) for cord in self.find_coordinate(x=0)]
             p2 = [int(cord) for cord in self.find_coordinate(x=w)]
+
+        p1 = int(np.clip(p1[0], params.UINT_MIN, params.UINT_MAX)), int(np.clip(p1[1], params.UINT_MIN, params.UINT_MAX))
+        p2 = int(np.clip(p2[0], params.UINT_MIN, params.UINT_MAX)), int(np.clip(p2[1], params.UINT_MIN, params.UINT_MAX))
 
         cv2.line(image, tuple(p1), tuple(p2), color, thickness)
 

@@ -23,7 +23,7 @@ VIOLATION_WRITER_WORKMODES = [Mode.DETECTION]
 CALIBRATOR_FREQUENCY = 2  # 50
 CALIBRATOR_RANSAC_THRESHOLD_RATIO = 0.01   # ransac acceptance of point threshold 0.03 (o.O15)
 
-CALIBRATOR_VP1_TRACK_MINIMUM = 20
+CALIBRATOR_VP1_TRACK_MINIMUM = 30
 CALIBRATOR_VP2_TRACK_MINIMUM = 30
 
 CALIBRATOR_MIN_LINE_LENGTH = 10             # 30
@@ -109,9 +109,8 @@ DEFAULT_THICKNESS = 1
 STATISTICS_LOG_FILENAME = "statistics.log"
 CALIBRATION_FILENAME = "calibration.log"
 
-
 # helpers
 UINT_MIN = -2147483648
 UINT_MAX = 2147483647
-RANDOM_COLOR = [(np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255)) for _ in range(100)]
+RANDOM_COLOR = [(np.random.randint(0, 50), np.random.randint(0, 50), np.random.randint(0, 50)) for _ in range(100)]
 COLOR_VANISHING_DIRECTIONS = [COLOR_GREEN, COLOR_BLUE, COLOR_RED]

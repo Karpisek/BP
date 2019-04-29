@@ -1,4 +1,6 @@
 import cv2
+import numpy as np
+
 import params
 
 from pipeline import PipeBlock
@@ -27,15 +29,20 @@ class VideoPlayer(PipeBlock):
 
     def _step(self, seq):
 
-        loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        loader_seq, image, foreground = self.receive(pipe_id=params.FRAME_LOADER_ID)
         observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
+
+        image_copy = np.copy(image)
 
         image = boxes_repository.draw(image)
 
-        image = self._info.draw_vanishing_points(image)
+        if self.mode == Mode.CALIBRATION:
+            image_copy = self._info.draw_corridors(image_copy)
+            image_copy = self._info.draw_vanishing_points(image_copy)
+            image_copy = self._info.draw_detected_traffic_lights(image_copy)
 
-        image = self._info.draw_corridors(image)
-        image = self._info.draw_detected_traffic_lights(image)
+        elif self.mode == Mode.DETECTION:
+            image_copy = self._info.draw_corridors(image_copy)
 
         self._info.draw_syntetic_traffic_lights(image, lights_state)
 
@@ -43,6 +50,7 @@ class VideoPlayer(PipeBlock):
             image = boxes_repository.draw_statistics(image, self._info)
 
         cv2.imshow("image", image)
+        cv2.imshow("detected segments", image_copy)
 
         key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
 

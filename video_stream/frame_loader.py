@@ -12,8 +12,7 @@ class FrameLoader(ThreadedPipeBlock):
     def __init__(self, output, info):
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._info = info
-        self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
-                                                              varThreshold=params.FRAME_LOADER_THRESHOLD)
+        self._subtractor = cv2.createBackgroundSubtractorKNN(history=100, detectShadows=True)
 
     def _before(self):
         if not self._info.traffic_lights_repository.ready:
@@ -37,12 +36,15 @@ class FrameLoader(ThreadedPipeBlock):
             self._update_mode(Mode.DETECTION)
 
         image = self._info.read()
+        mask = self._subtractor.apply(image)
+        _, threshold = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
+        median_blured_bg = cv2.medianBlur(threshold, 5)
 
         for _ in range(int(self._info.fps / 20)):
             image = self._info.read()
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
-            message = (seq, np.copy(image))
+            message = (seq, np.copy(image), np.copy(median_blured_bg))
             self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
 
         if is_frequency(seq, params.TRAFFIC_LIGHT_OBSERVER_FREQUENCY):

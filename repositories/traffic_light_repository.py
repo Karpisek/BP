@@ -106,8 +106,8 @@ class TrafficLight:
         current_light = current_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
         previous_light = previous_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
 
-        smoothed_current_light = cv2.blur(current_light, (5, 5))
-        smoothed_previous_light = cv2.blur(previous_light, (5, 5))
+        smoothed_current_light = cv2.blur(current_light, (3, 3))
+        smoothed_previous_light = cv2.blur(previous_light, (3, 3))
 
         combined_image = cv2.max(smoothed_current_light, smoothed_previous_light)
 
@@ -126,7 +126,7 @@ class TrafficLight:
 
         all_count = red_count + orange_count + green_count
 
-        if all_count < 30:
+        if all_count < 10:  # 30
             return 0, 0, 0
         else:
             return red_count/all_count, orange_count/all_count, green_count/all_count

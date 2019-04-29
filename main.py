@@ -10,7 +10,7 @@ from detectors import Detector
 import params
 from video_stream.video_writer import ViolationWriter
 
-VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
+# VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/x.mov"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00003.MTS"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00002.MTS"
@@ -22,7 +22,7 @@ VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2b.mp4"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
