@@ -1,3 +1,4 @@
+import json
 import shutil
 
 import cv2
@@ -11,6 +12,7 @@ from collections import deque
 from copy import deepcopy
 
 from pipeline import ThreadedPipeBlock
+from pipeline.base.pipeline import Mode
 
 
 class ViolationWriter(ThreadedPipeBlock):
@@ -19,12 +21,13 @@ class ViolationWriter(ThreadedPipeBlock):
         pass
 
     def __init__(self, info, program_arguments):
-        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=params.VIOLATION_WRITER_WORKMODES, deamon=False)
+        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
         self._info = info
         self._video_writers = {}
+        self._captured_ids = []
         self._last_boxes_repository = None
         self._path = f"{program_arguments.output_dir}/{self._info.filename}"
-        self._history = deque(maxlen=21)
+        self._history = deque(maxlen=params.VIOLATION_WRITER_SEQUENCE_LENGTH)
 
     def _before(self):
         if os.path.exists(self._path):
@@ -40,23 +43,25 @@ class ViolationWriter(ThreadedPipeBlock):
         package = image, boxes_repository, lights_state
 
         for car_id in boxes_repository.red_riders:
-            if car_id not in self._video_writers.keys():
+            if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
                                                           image_history=deepcopy(self._history),
                                                           path=self._path)
+                self._captured_ids.append(car_id)
 
         for car_id in boxes_repository.orange_riders:
-            if car_id not in self._video_writers.keys():
+            if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
                                                           image_history=deepcopy(self._history),
                                                           path=self._path)
+                self._captured_ids.append(car_id)
 
         for _, writer in list(self._video_writers.items()):
             writer.add_package(package)
 
-            if writer.lifetime == 0:
+            if writer.lifetime < 0:
                 writer.close()
                 del self._video_writers[writer.car_id]
 
@@ -93,11 +98,15 @@ class ViolationWriter(ThreadedPipeBlock):
 
 class VideoWriter:
     def __init__(self, info, car_id, image_history, path):
-        self._path = f"{path}/{car_id}.avi"
+        self._path = f"{path}/{car_id}"
         self._car_id = car_id
         self._info = info
-        self._output = cv2.VideoWriter(self._path, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), self._info.fps, (self._info.width, self._info.height))
-        self._lifetime = len(image_history)
+        self._output = cv2.VideoWriter(self._path + ".avi", cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), self._info.fps, (self._info.width, self._info.height))
+        self._lifetime = 2 * len(image_history)
+        self._annotation_output = {"top_left": [],
+                                   "bottom_right": [],
+                                   "behaviour": []}
+
         for package in image_history:
             self.add_package(package)
 
@@ -112,17 +121,21 @@ class VideoWriter:
     def add_package(self, package):
         image, boxes_repository, lights_state = package
 
-        image = np.copy(image)
-
         try:
-            boxes_repository.get_box_by_id(self.car_id).draw(image)
-        except KeyError:
-            pass
+            car_box = boxes_repository.get_box_by_id(self.car_id)
+            self._annotation_output["top_left"].append(car_box.top_left)
+            self._annotation_output["bottom_right"].append(car_box.bottom_right)
+            self._annotation_output["behaviour"].append(car_box.behaviour)
 
-        image = self._info.draw_syntetic_traffic_lights(image, lights_state)
+        except KeyError:
+            self._annotation_output["top_left"].append(None)
+            self._annotation_output["bottom_right"].append(None)
+            self._annotation_output["behaviour"].append(None)
 
         self._output.write(image)
         self._lifetime -= 1
 
     def close(self):
         self._output.release()
+        with open(self._path + ".txt", "w") as file:
+            json.dump(self._annotation_output, file)

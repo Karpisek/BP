@@ -1,8 +1,6 @@
 import numpy as np
 
 # pipeline block id's
-from pipeline.base.pipeline import Mode
-
 VIDEO_PLAYER_ID = 0
 FRAME_LOADER_ID = 1
 DETECTOR_CAR_ID = 2
@@ -17,7 +15,7 @@ VIOLATION_WRITER_ID = 10
 
 # traffic violation writer
 VIOLATION_WRITER_FREQUENCY = 1
-VIOLATION_WRITER_WORKMODES = [Mode.DETECTION]
+VIOLATION_WRITER_SEQUENCE_LENGTH = 30
 
 # calibrator
 CALIBRATOR_FREQUENCY = 2  # 50

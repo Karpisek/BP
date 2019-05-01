@@ -120,7 +120,7 @@ class PcLines:
         best_line_ratio = 0
         best_line = None
 
-        print(len(self.s_points))
+        # print(len(self.s_points))
 
         for line in preset_pc_points:
             num = 0

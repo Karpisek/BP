@@ -1,5 +1,5 @@
 from copy import deepcopy
-from enum import Enum
+from enum import Enum, IntEnum
 
 import cv2
 
@@ -11,7 +11,7 @@ from pipeline.base.pipeline import Mode
 from pipeline.traffic_light_observer import Color
 
 
-class CarBehaviourMode(Enum):
+class CarBehaviourMode(IntEnum):
     NORMAL = 1
     LINE_CROSSED = 2
     RED_DRIVER = 3
@@ -28,6 +28,18 @@ class Box2D:
         self._behaviour = CarBehaviourMode.NORMAL
 
         self._lifetime = 1
+
+    @property
+    def behaviour(self):
+        return self._behaviour
+
+    @property
+    def top_left(self):
+        return self._top_left
+
+    @property
+    def bottom_right(self):
+        return self._bottom_right
 
     @property
     def car_id(self):
