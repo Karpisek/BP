@@ -29,20 +29,21 @@ class VideoPlayer(PipeBlock):
 
     def _step(self, seq):
 
-        loader_seq, image, foreground = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
         observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
 
         image_copy = np.copy(image)
 
         image = boxes_repository.draw(image)
-
-        if self.mode == Mode.CALIBRATION:
-            image_copy = self._info.draw_corridors(image_copy)
-            image_copy = self._info.draw_vanishing_points(image_copy)
-            image_copy = self._info.draw_detected_traffic_lights(image_copy)
-
-        elif self.mode == Mode.DETECTION:
-            image_copy = self._info.draw_corridors(image_copy)
+        #
+        # if self.mode == Mode.CALIBRATION:
+        #     # image_copy = self._info.draw_corridors(image_copy)
+        #     image_copy = self._info.draw_vanishing_points(image_copy)
+        #     image_copy = self._info.draw_detected_traffic_lights(image_copy)
+        #
+        # elif self.mode == Mode.DETECTION:
+        #     pass
+        image_copy = self._info.draw_corridors(image_copy)
 
         self._info.draw_syntetic_traffic_lights(image, lights_state)
 

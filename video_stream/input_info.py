@@ -219,13 +219,13 @@ class Info:
         self._width = width
         self._width = height
 
-    def write_calibration(self, file):
+    def get_calibration(self):
         data = {"vanishing points": [vp.serialize() for vp in self.vanishing_points]}
         data.update(self.traffic_lights_repository.serialize())
         data.update(self.corridors_repository.serialize())
 
-        print(data)
-        json.dump(data, file)
+        return data
+
 
 
 

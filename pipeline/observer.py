@@ -145,9 +145,9 @@ class Box2D:
 class BBoxRepository:
     def __init__(self):
         self._boxes = {}
-        self._red_riders = []
-        self._orange_riders = []
-        self._all_cars = []
+        self._red_riders = {}
+        self._orange_riders = {}
+        self._all_cars = {}
 
     @property
     def boxes(self):
@@ -182,7 +182,7 @@ class BBoxRepository:
 
         return {corridor: [box for box in sorted_boxes if box.get_corridor(info) == corridor]for corridor in corridor_ids}
 
-    def insert_or_update(self, anchors, car_id, velocity, lights_state, info):
+    def insert_or_update(self, anchors, car_id, velocity, lights_state, info, seq):
         if car_id not in self._boxes:
             self._boxes[car_id] = Box2D(car_id)
 
@@ -190,20 +190,20 @@ class BBoxRepository:
 
         if behaviour in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER, CarBehaviourMode.LINE_CROSSED]:
             if car_id not in self._all_cars:
-                self._all_cars.append(car_id)
+                self._all_cars[car_id] = seq
 
         if behaviour == CarBehaviourMode.RED_DRIVER:
             try:
-                self._orange_riders.remove(car_id)
-            except ValueError:
+                self._orange_riders.pop(car_id)
+            except KeyError:
                 pass
 
             if car_id not in self._red_riders:
-                self._red_riders.append(car_id)
+                self._red_riders[car_id] = seq
 
         if behaviour == CarBehaviourMode.ORANGE_DRIVER:
             if car_id not in self._orange_riders:
-                self._orange_riders.append(car_id)
+                self._orange_riders[car_id] = seq
 
     def check_lifetime(self):
         for key, box in self._boxes.copy().items():
@@ -251,16 +251,21 @@ class BBoxRepository:
 
         return np.concatenate((statistics_panel, image), axis=0)
 
-    def write_statistics(self, file):
-        file.write(f"Total cars: {self.car_count}\n")
-        file.write(f"Red drivers: {self.red_drivers_count}\n")
-        file.write(f"Orange drivers: {self.orange_drivers_count}\n")
+    def get_statistics(self):
+        return {
+            "total_cars_count": self.car_count,
+            "red_drivers_count": self.red_drivers_count,
+            "orange_drivers_count": self.orange_drivers_count,
+            "red_drivers": self.red_riders,
+            "orange_drivers": self.orange_riders,
+            "all_drivers": self._all_cars
+        }
 
     def restart(self):
         self._boxes = {}
-        self._red_riders = []
-        self._orange_riders = []
-        self._all_cars = []
+        self._red_riders = {}
+        self._orange_riders = {}
+        self._all_cars = {}
 
 
 class Observer(ThreadedPipeBlock):
@@ -283,7 +288,7 @@ class Observer(ThreadedPipeBlock):
 
         for tracked_object in tracked_objects:
             anchors, _, car_info, car_velocity = tracked_object
-            self._bounding_boxes_repository.insert_or_update(anchors, car_info, car_velocity, current_lights_state, self._info)
+            self._bounding_boxes_repository.insert_or_update(anchors, car_info, car_velocity, current_lights_state, self._info, seq)
 
         self._bounding_boxes_repository.check_lifetime()
 

@@ -69,7 +69,9 @@ class PipeBlock:
                         frame_counter = 0
                         clock = time.time()
 
+                # clock = time.time()
                 self._step(seq)
+                # print(f" {self.__class__.__name__} Time: ", time.time() - clock)
 
         except EOFError:
             self._after()
@@ -91,7 +93,11 @@ class PipeBlock:
         mode = self._mode
 
         envelope = mode, message
-        self._output[pipe_id].deliver(envelope, pipe_id=self.id, block=block)
+
+        try:
+            self._output[pipe_id].deliver(envelope, pipe_id=self.id, block=block)
+        except KeyError:
+            pass
 
     def deliver(self, envelope, pipe_id: int, block):
         try:

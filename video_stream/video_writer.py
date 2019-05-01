@@ -13,6 +13,7 @@ from copy import deepcopy
 
 from pipeline import ThreadedPipeBlock
 from pipeline.base.pipeline import Mode
+from repositories.traffic_light_repository import Color
 
 
 class ViolationWriter(ThreadedPipeBlock):
@@ -25,6 +26,13 @@ class ViolationWriter(ThreadedPipeBlock):
         self._info = info
         self._video_writers = {}
         self._captured_ids = []
+        self._light_states = {"red": [],
+                              "orange": [],
+                              "red_orange": [],
+                              "green": [],
+                              "none": []}
+
+        self._current_light_state = None
         self._last_boxes_repository = None
         self._path = f"{program_arguments.output_dir}/{self._info.filename}"
         self._history = deque(maxlen=params.VIOLATION_WRITER_SEQUENCE_LENGTH)
@@ -42,7 +50,9 @@ class ViolationWriter(ThreadedPipeBlock):
         observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
         package = image, boxes_repository, lights_state
 
-        for car_id in boxes_repository.red_riders:
+        self._save_light_state(lights_state, seq)
+
+        for car_id in boxes_repository.red_riders.keys():
             if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
@@ -50,7 +60,7 @@ class ViolationWriter(ThreadedPipeBlock):
                                                           path=self._path)
                 self._captured_ids.append(car_id)
 
-        for car_id in boxes_repository.orange_riders:
+        for car_id in boxes_repository.orange_riders.keys():
             if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
@@ -87,13 +97,36 @@ class ViolationWriter(ThreadedPipeBlock):
             path = f"{self._path}/{params.STATISTICS_LOG_FILENAME}"
 
             with open(path, "w") as file:
-                self._last_boxes_repository.write_statistics(file)
+                data = self._last_boxes_repository.get_statistics()
+                data.update({"light_states": self._light_states})
+
+                json.dump(data, file)
 
     def _write_calibration(self):
         path = f"{self._path}/{params.CALIBRATION_FILENAME}"
 
         with open(path, "w") as file:
-            self._info.write_calibration(file)
+            data = self._info.get_calibration()
+            json.dump(data, file)
+
+    def _save_light_state(self, lights_state, seq):
+        if lights_state != self._current_light_state:
+            if lights_state == Color.GREEN:
+                self._light_states["green"].append(seq)
+
+            elif lights_state == Color.ORANGE:
+                self._light_states["orange"].append(seq)
+
+            elif lights_state == Color.RED:
+                self._light_states["red"].append(seq)
+
+            elif lights_state == Color.RED_ORANGE:
+                self._light_states["red_orange"].append(seq)
+
+            else:
+                self._light_states["none"].append(seq)
+
+            self._current_light_state = lights_state
 
 
 class VideoWriter:
@@ -137,5 +170,5 @@ class VideoWriter:
 
     def close(self):
         self._output.release()
-        with open(self._path + ".txt", "w") as file:
+        with open(self._path + ".json", "w") as file:
             json.dump(self._annotation_output, file)

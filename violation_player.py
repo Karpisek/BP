@@ -28,7 +28,7 @@ for opt, arg in opts:
 if video_input is None:
     exit(1)
 
-annotation_input = video_input[:-3] + "txt"
+annotation_input = video_input[:-3] + "json"
 
 tape = cv2.VideoCapture(video_input)
 
@@ -56,5 +56,5 @@ while True:
         cv2.rectangle(img=frame, pt1=tuple(top_left), pt2=tuple(bottom_right), color=color, thickness=3)
 
     cv2.imshow(annotation_input, frame)
-    cv2.waitKey(60)
+    cv2.waitKey(0)
     frame_counter += 1

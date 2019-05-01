@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 import cv2
 import tensorflow as tf
@@ -9,7 +9,7 @@ from bbox import Coordinates
 from repositories.base.repository import Repository
 
 
-class Color(Enum):
+class Color(IntEnum):
     RED = 0
     RED_ORANGE = 1
     ORANGE = 2
