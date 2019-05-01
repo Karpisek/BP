@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 import cv2
 import tensorflow as tf
@@ -9,7 +9,7 @@ from bbox import Coordinates
 from repositories.base.repository import Repository
 
 
-class Color(Enum):
+class Color(IntEnum):
     RED = 0
     RED_ORANGE = 1
     ORANGE = 2
@@ -93,6 +93,9 @@ class TrafficLightsRepository(Repository):
 
         return image
 
+    def serialize(self):
+        return {"traffic light": self._traffic_lights[0].serialize()}
+
 
 class TrafficLight:
     def __init__(self, top_left, bottom_right):
@@ -103,17 +106,17 @@ class TrafficLight:
         current_light = current_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
         previous_light = previous_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
 
-        smoothed_current_light = cv2.blur(current_light, (5, 5))
-        smoothed_previous_light = cv2.blur(previous_light, (5, 5))
+        smoothed_current_light = cv2.blur(current_light, (3, 3))
+        smoothed_previous_light = cv2.blur(previous_light, (3, 3))
 
         combined_image = cv2.max(smoothed_current_light, smoothed_previous_light)
 
         hsv_image = cv2.cvtColor(combined_image, cv2.COLOR_BGR2HSV)
 
-        low_red_mask = cv2.inRange(hsv_image, (0, 100, 20), (5, 255, 255))
-        up_red_mask = cv2.inRange(hsv_image, (160, 100, 20), (180, 255, 255))
-        orange_mask = cv2.inRange(hsv_image, (5, 100, 20), (25, 255, 255))
-        green_mask = cv2.inRange(hsv_image, (30, 100, 20), (90, 255, 255))
+        low_red_mask = cv2.inRange(hsv_image, (0, 100, 10), (5, 255, 255))
+        up_red_mask = cv2.inRange(hsv_image, (160, 100, 10), (180, 255, 255))
+        orange_mask = cv2.inRange(hsv_image, (5, 100, 10), (25, 255, 255))
+        green_mask = cv2.inRange(hsv_image, (30, 100, 10), (95, 255, 255))
 
         red_mask = np.maximum(low_red_mask, up_red_mask)
 
@@ -123,7 +126,7 @@ class TrafficLight:
 
         all_count = red_count + orange_count + green_count
 
-        if all_count < 30:
+        if all_count < 10:  # 30
             return 0, 0, 0
         else:
             return red_count/all_count, orange_count/all_count, green_count/all_count
@@ -134,6 +137,9 @@ class TrafficLight:
                       pt2=self._bottom_right,
                       thickness=params.DEFAULT_THICKNESS,
                       color=params.COLOR_YELLOW)
+
+    def serialize(self):
+        return {"top left": list(self._top_left), "bottom right": list(self._bottom_right)}
 
 
 

@@ -40,7 +40,10 @@ class VanishingPoint:
 
     @property
     def direction(self):
-        return self._direction
+        if not self.infinity:
+            raise VanishingPointError
+        else:
+            return self._direction
 
     def draw_line(self, image, point, color, thickness):
         if self.infinity:
@@ -57,3 +60,8 @@ class VanishingPoint:
     def __str__(self):
         return f"Vanishing Point - x: {self._point[0]} y: {self._point[1]}"
 
+    def serialize(self):
+        try:
+            return {"point": self.point, "direction": None}
+        except VanishingPointError:
+            return {"point": None, "direction": self.direction}

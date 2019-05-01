@@ -3,7 +3,7 @@ import numpy as np
 
 import params
 from pc_lines.line import Line, SamePointError
-from pc_lines.vanishing_point import VanishingPoint
+from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
 
 
 def _mouse_callback(event, x, y, _, param):
@@ -162,8 +162,11 @@ class TrafficCorridorRepository:
         # greyscale image and reduce noise by multiple blur and threshold
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
-        edge_grey_blured = cv2.medianBlur(edge_grey, 21)
+        edge_grey_blured = cv2.medianBlur(edge_grey, 31)
         _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+
+        # edge_grey_blured = cv2.medianBlur(threshold, 21)
+        # _, threshold = cv2.threshold(edge_grey_blured, 10, 255, cv2.THRESH_BINARY)
 
         height, width = edge_grey_blured.shape
 
@@ -196,8 +199,10 @@ class TrafficCorridorRepository:
             for coordinate in list(point):
                 if coordinate < self._info.height:
                     points.append((0, coordinate))
+
                 elif coordinate < self._info.height + self._info.width:
                     points.append((coordinate - self._info.height, self._info.height - 1))
+
                 else:
                     points.append((self._info.width - 1, self._info.width + 2 * self._info.height - coordinate))
 
@@ -210,7 +215,7 @@ class TrafficCorridorRepository:
 
         # cv2.imwrite("mask.jpg", self.get_mask())
         cv2.imwrite("lifeline.jpg", frame_edge)
-        cv2.imwrite("lifeline_before.jpg", edge_grey_blured)
+        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
         self._corridors_found = True
@@ -218,7 +223,7 @@ class TrafficCorridorRepository:
     def add_stop_point(self, coordinates):
         self._stop_places.append(coordinates)
 
-        if len(self._stop_places) > params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
+        if len(self._stop_places) >= params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
             self.find_stop_line()
 
     def find_stop_line(self):
@@ -240,6 +245,8 @@ class TrafficCorridorRepository:
                 line = Line(vp2.point, point2.tuple())
             except SamePointError:
                 continue
+            except VanishingPointError:
+                line = Line(point1=point2.tuple(), direction=vp2.direction)
 
             num = 0
             ransac_threshold = params.CORRIDORS_RANSAC_THRESHOLD
@@ -256,6 +263,9 @@ class TrafficCorridorRepository:
         self._stop_line = best_line
         self._stopline_found = True
 
+    def serialize(self):
+        return {"corridors": "not implemented"}
+
 
 class TrafficCorridor:
     def __init__(self, index, left_line, right_line, middle_point):
@@ -270,25 +280,33 @@ class TrafficCorridor:
         return self._id
 
     def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
-        mask = np.zeros(shape=(info.height, info.width),
-                        dtype=np.uint8)
-
         if color is None:
             color = self.id
 
-        self.left_line.draw(image, color, thickness)
-        self.left_line.draw(mask, color, thickness)
-
-        self.right_line.draw(image, color, thickness)
-        self.right_line.draw(mask, color, thickness)
-
         if fill:
+            mask = np.zeros(shape=(info.height, info.width),
+                            dtype=np.uint8)
+
+            self.left_line.draw(image, color, thickness)
+            self.left_line.draw(mask, color, thickness)
+
+            self.right_line.draw(image, color, thickness)
+            self.right_line.draw(mask, color, thickness)
+
             mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
 
             cv2.floodFill(image=image,
                           mask=mask_with_border,
                           seedPoint=self.middle_point,
                           newVal=color)
+        else:
+            self.left_line.draw(image=image,
+                                color=color,
+                                thickness=5)
+
+            self.right_line.draw(image=image,
+                                 color=color,
+                                 thickness=5)
 
     def __str__(self):
         return f"corridor: id [{self.id}]"

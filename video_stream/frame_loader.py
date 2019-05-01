@@ -12,8 +12,6 @@ class FrameLoader(ThreadedPipeBlock):
     def __init__(self, output, info):
         super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
         self._info = info
-        self._subtractor = cv2.createBackgroundSubtractorMOG2(history=params.FRAME_LOADER_SUBTRACTOR_HISTORY,
-                                                              varThreshold=params.FRAME_LOADER_THRESHOLD)
 
     def _before(self):
         if not self._info.traffic_lights_repository.ready:
@@ -24,6 +22,7 @@ class FrameLoader(ThreadedPipeBlock):
 
                 final_image = np.maximum(final_image, image)
 
+            cv2.imwrite("aha.jpg", final_image)
             self._info.traffic_lights_repository.find(image=final_image)
             self._info.reopen()
 
@@ -60,6 +59,9 @@ class FrameLoader(ThreadedPipeBlock):
             message = (seq, np.copy(image))
             self.send(message, pipe_id=params.DETECTOR_CAR_ID)
 
-        # if is_frequency(seq, params.VIDEO_WRITER_FREQUENCY):
-        #     message = (seq, np.copy(image))
-        #     self.send(message, pipe_id=params.VIDEO_WRITER_ID)
+        if is_frequency(seq, params.VIOLATION_WRITER_FREQUENCY):
+            message = (seq, np.copy(image))
+            self.send(message, pipe_id=params.VIOLATION_WRITER_ID)
+
+    def _after(self):
+        self.send(EOFError, pipe_id=params.VIDEO_PLAYER_ID)

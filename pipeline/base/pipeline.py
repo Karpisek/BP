@@ -17,6 +17,7 @@ class Mode(Enum):
     CALIBRATION = 0,
     DETECTION = 1
     SIGNAL = 3,
+    END = 4,
 
 
 class PipeBlock:
@@ -68,16 +69,13 @@ class PipeBlock:
                         frame_counter = 0
                         clock = time.time()
 
+                # clock = time.time()
                 self._step(seq)
+                # print(f" {self.__class__.__name__} Time: ", time.time() - clock)
 
         except EOFError:
             self._after()
-            self._delegate_end()
-
-        print(f"thread {self.__class__.__name__} finally ended")
-
-    def _end_block(self):
-        raise EOFError
+            print(f"thread {self.__class__.__name__} finally ended")
 
     def _before(self):
         raise NotImplementedError
@@ -91,19 +89,15 @@ class PipeBlock:
     def _mode_changed(self, new_mode):
         raise NotImplementedError
 
-    def _delegate_end(self):
-        for pipe in PipeBlock.pipes:
-            try:
-                envelope = Mode.SIGNAL, EOFError
-                pipe.deliver(envelope, pipe_id=self.id, block=True)
-            except KeyError:
-                pass
-
     def send(self, message, pipe_id, block=True):
         mode = self._mode
 
         envelope = mode, message
-        self._output[pipe_id].deliver(envelope, pipe_id=self.id, block=block)
+
+        try:
+            self._output[pipe_id].deliver(envelope, pipe_id=self.id, block=block)
+        except KeyError:
+            pass
 
     def deliver(self, envelope, pipe_id: int, block):
         try:
@@ -119,7 +113,7 @@ class PipeBlock:
         try:
             mode, message = self._input[pipe_id].get(block)
             if message is EOFError:
-                self._end_block()
+                raise EOFError
 
             self._update_mode(mode)
             return message
@@ -140,14 +134,21 @@ class PipeBlock:
     def __str__(self):
         return f"{self.__class__.__name__}: {[queue.qsize() for key, queue in self._input.items()]}"
 
+    @property
+    def mode(self):
+        return self._mode
+
 
 class ThreadedPipeBlock(PipeBlock):
 
-    def __init__(self, pipe_id, output=None, max_steps=np.inf, work_modes=None):
+    def _mode_changed(self, new_mode):
+        pass
+
+    def __init__(self, pipe_id, output=None, max_steps=np.inf, work_modes=None, deamon=True):
         super().__init__(pipe_id=pipe_id, output=output, work_modes=work_modes)
 
         self._thread = Thread(target=self._run)
-        self._thread.daemon = True
+        self._thread.daemon = deamon
         self._max_steps = max_steps
 
     def start(self):
@@ -162,3 +163,6 @@ class ThreadedPipeBlock(PipeBlock):
 
     def _after(self):
         print(f"after {self.__class__.__name__}")
+
+    def join(self):
+        self._thread.join()

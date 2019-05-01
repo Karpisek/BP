@@ -28,7 +28,7 @@ class Calibrator(ThreadedPipeBlock):
 
     def _mode_changed(self, new_mode):
         if new_mode == Mode.DETECTION:
-            self._end_block()
+            raise EOFError
 
     def _step(self, seq):
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
@@ -42,8 +42,8 @@ class Calibrator(ThreadedPipeBlock):
             elif len(self._info.vanishing_points) < 2:
                 self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
 
-            elif len(self._info.vanishing_points) < 3:
-                self.calculate_third_vp()
+            # elif len(self._info.vanishing_points) < 3:
+            #     self.calculate_third_vp()
 
             elif len(lifelines) > params.CORRIDORS_MINIMUM_LIFELINES:
                 self.find_corridors(lifelines)
@@ -63,8 +63,9 @@ class Calibrator(ThreadedPipeBlock):
         if light_status in [Color.RED, Color.RED_ORANGE]:
             return
 
-        selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2BGR))
-        blured = cv2.blur(selected_areas, (3, 3))
+        selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2RGB))
+        # blured = cv2.blur(selected_areas, (3, 3))
+        blured = cv2.GaussianBlur(selected_areas, (7, 7), 0)
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
         no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
@@ -77,7 +78,8 @@ class Calibrator(ThreadedPipeBlock):
 
         vp1 = self._info.vanishing_points[0]
 
-        detected_lines = []
+        canny = cv2.cvtColor(canny, cv2.COLOR_GRAY2RGB)
+
         if lines is not None:
             for (x1, y1, x2, y2), in lines:
                 point1 = x1, y1
@@ -90,26 +92,15 @@ class Calibrator(ThreadedPipeBlock):
                         line_to_vp = Line(point2, vp1.point)
 
                     if Line(point1, point2).angle(line_to_vp) < 30 or Line(point1, point2).angle(line_to_vp) > 150:
-                        cv2.line(selected_areas, point1, point2, params.COLOR_WHITE, 1)
+                        cv2.line(canny, point1, point2, params.COLOR_RED, 1)
                         continue
 
-                    detected_lines.append(Line(point1, point2))
                     self._pc_lines.add_to_pc_space(point1, point2)
-                    cv2.line(selected_areas, point1, point2, params.COLOR_BLUE, 1)
+                    cv2.line(canny, point1, point2, params.COLOR_BLUE, 1)
                 except SamePointError:
                     continue
 
-        # if detected_lines:
-        #     best_lines = sorted(detected_lines, key=lambda l: l.magnitude, reverse=True)
-        #
-        #     line_count = 0
-        #     for line in best_lines:
-        #         line_count += 1
-        #         if line_count > 2:
-        #             break
-        #
-        #         self._pc_lines.add_to_pc_space(line=line)
-        #         line.draw(selected_areas, color=params.COLOR_BLUE, thickness=params.DEFAULT_THICKNESS)
+            cv2.imwrite("test.jpg", canny)
 
         if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_lines_cross()
@@ -125,26 +116,26 @@ class Calibrator(ThreadedPipeBlock):
 
             self._pc_lines.clear()
 
-        cv2.imwrite("test.jpg", selected_areas)
-
-    def calculate_third_vp(self):
-        vp1 = self._info.vanishing_points[0].point
-
-        try:
-            vp2 = self._info.vanishing_points[1].point
-            vp1_to_vp2 = Line(point1=vp1,
-                              point2=vp2)
-
-        except VanishingPointError:
-            vp1_to_vp2 = Line(point1=vp1,
-                              direction=self._info.vanishing_points[1].direction)
-
-        self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
+    # def calculate_third_vp(self):
+    #     vp1 = self._info.vanishing_points[0].point
+    #
+    #     try:
+    #         vp2 = self._info.vanishing_points[1].point
+    #         vp1_to_vp2 = Line(point1=vp1,
+    #                           point2=vp2)
+    #
+    #     except VanishingPointError:
+    #         vp1_to_vp2 = Line(point1=vp1,
+    #                           direction=self._info.vanishing_points[1].direction)
+    #
+    #     self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
 
     def find_corridors(self, lifelines):
+        filtered_lifelines = TrackedObject.filter_lifelines(lifelines, self._info.vp1)
+
         mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
         mask = TrackedObject.draw_lifelines(image=mask,
-                                            lifelines=lifelines,
+                                            lifelines=filtered_lifelines,
                                             color=params.COLOR_LIFELINE,
                                             thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
 

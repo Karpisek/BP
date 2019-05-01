@@ -54,6 +54,7 @@ class TrackedObjectsRepository:
     def __init__(self, info):
         self._id_counter = 0
         self._lifelines = []
+        self._collected_lifelines_id = []
         self._tracked_objects = []
         self._info = info
 
@@ -109,10 +110,12 @@ class TrackedObjectsRepository:
     def control_boxes(self) -> None:
 
         for tracked_object in self._tracked_objects:
-            if not self._info.update_area.contains(tracked_object.tracker_point):
-                if tracked_object.history.y > tracked_object.center.y:
+            if tracked_object.id not in self._collected_lifelines_id and not self._info.update_area.contains(tracked_object.tracker_point):
+                if tracked_object.history.y > tracked_object.tracker_point.y:
                     self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+                    self._collected_lifelines_id.append(tracked_object.id)
 
+            if not self._info.update_area.contains(tracked_object.tracker_point):
                 self._tracked_objects.remove(tracked_object)
 
     def serialize(self):
@@ -171,6 +174,21 @@ class TrackedObject:
             return hull
 
     @staticmethod
+    def filter_lifelines(lifelines, vp1):
+        filtered = []
+
+        for lifeline in lifelines:
+            line_to_vp = Line(lifeline[0], vp1.point)
+            lifeline_line = Line(lifeline[0], lifeline[1])
+
+            if 30 < lifeline_line.angle(line_to_vp) < 150:
+                continue
+            else:
+                filtered.append(lifeline)
+
+        return filtered
+
+    @staticmethod
     def draw(image, boxes, lifelines=None) -> np.ndarray:
 
         for box in boxes:
@@ -216,7 +234,11 @@ class TrackedObject:
             [np.float32(0)],  # dy
         ])
 
-        self._start_coordinates = coordinates
+        self._start_coordinates = self.center
+
+    @property
+    def flow(self):
+        return self._kalman.statePost[2][0], self._kalman.statePost[3][0]
 
     @property
     def history(self):
@@ -325,11 +347,6 @@ class TrackedObject:
 
     def predict(self) -> ((float, float), (float, float)) or None:
         self._kalman.predict()
-        self.lifetime -= 1
-
-        if self.center.y < self.history.y:
-            if self.lifetime == 0:
-                return self.history.tuple(), self.center.tuple()
 
         if self._info.vp1 is not None:
             vp1 = self._info.vanishing_points[0]
