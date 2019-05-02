@@ -15,15 +15,9 @@ class FrameLoader(ThreadedPipeBlock):
 
     def _before(self):
         if not self._info.traffic_lights_repository.ready:
-            final_image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
+            image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
 
-            for _ in range(params.DETECTOR_LIGHT_IMAGE_ROW):
-                image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
-
-                final_image = np.maximum(final_image, image)
-
-            cv2.imwrite("aha.jpg", final_image)
-            self._info.traffic_lights_repository.find(image=final_image)
+            self._info.traffic_lights_repository.find(image=image)
             self._info.reopen()
 
     def _mode_changed(self, new_mode):
@@ -35,9 +29,6 @@ class FrameLoader(ThreadedPipeBlock):
             self._update_mode(Mode.DETECTION)
 
         image = self._info.read()
-
-        for _ in range(int(self._info.fps / 20)):
-            image = self._info.read()
 
         if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
             message = (seq, np.copy(image))

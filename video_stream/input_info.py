@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 
 import cv2
 import numpy as np
@@ -10,9 +11,18 @@ from repositories.traffic_light_repository import TrafficLightsRepository
 from pipeline.traffic_light_observer import Color
 
 
-class Info:
-    def __init__(self, video_path, light_detection_model, program_arguments):
+class CalibrationMode(Enum):
+    AUTOMATIC = 0
+    LIGHTS_MANUAL = 1
+    CORRIDORS_MANUAL = 2
+    MANUAL = 3
 
+    def __str__(self):
+        return self.name.lower()
+
+
+class VideoInfo:
+    def __init__(self, video_path):
         self._input = cv2.VideoCapture(video_path)
         filename_with_extension = video_path.rsplit('/', 1)[1]
         self._file_name = filename_with_extension.rsplit('.', 1)[0]
@@ -29,11 +39,62 @@ class Info:
             self._height = int(params.FRAME_LOADER_MAX_WIDTH * self._ratio)
             self._resize = True
 
+    @property
+    def filename(self):
+        return self._file_name
+
+    @property
+    def ratio(self):
+        return self._ratio
+
+    @property
+    def frame_count(self):
+        return self._frame_count
+
+    @property
+    def height(self):
+        return int(self._height)
+
+    @property
+    def fps(self) -> int:
+        return int(self._fps)
+
+    def read(self, width=None):
+        """
+        :raise EOFError when end of input
+        :return:
+        """
+
+        status, frame = self._input.read()
+
+        for _ in range(int(self.fps / params.FRAME_LOADER_MAX_FPS)):
+            status, image = self._input.read()
+
+        if not status:
+            raise EOFError
+
+        if width is not None:
+            return cv2.resize(frame, (width, int(width * self.ratio)))
+        elif self._resize:
+            return cv2.resize(frame, (self._width, self._height))
+        else:
+            return frame
+
+    def reopen(self):
+        self._input.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+
+class Info(VideoInfo):
+    def __init__(self, video_path, light_detection_model, program_arguments):
+
+        super().__init__(video_path)
+
         self._vanishing_points = []
         self._traffic_lights_repository = TrafficLightsRepository(model=light_detection_model, info=self)
         self._corridors_repository = TrafficCorridorRepository(self)
 
         self._detect_vanishing_points = True
+        self._calibration_mode = CalibrationMode.AUTOMATIC
 
         # solve given program arguments
         self._solve_program_arguments(program_arguments)
@@ -58,15 +119,21 @@ class Info:
 
             self._corridors_repository.select_manually(image)
             self._detect_vanishing_points = False
+            self._calibration_mode = CalibrationMode.CORRIDORS_MANUAL
 
         if program_arguments.insert_light:
             print("Please select as accurate as possible rectangle containing traffic light")
 
             self._traffic_lights_repository.select_manually(image)
 
+            if self._calibration_mode == CalibrationMode.AUTOMATIC:
+                self._calibration_mode = CalibrationMode.LIGHTS_MANUAL
+            else:
+                self._calibration_mode = CalibrationMode.MANUAL
+
     @property
-    def filename(self):
-        return self._file_name
+    def calibration_mode(self):
+        return self._calibration_mode
 
     @property
     def vp1(self):
@@ -78,14 +145,6 @@ class Info:
     @property
     def traffic_lights_repository(self):
         return self._traffic_lights_repository
-
-    @property
-    def ratio(self):
-        return self._ratio
-
-    @property
-    def frame_count(self):
-        return self._frame_count
 
     @property
     def calibrated(self):
@@ -108,41 +167,12 @@ class Info:
         return int(self._width)
 
     @property
-    def height(self):
-        return int(self._height)
-
-    @property
-    def fps(self) -> int:
-        return int(self._fps)
-
-    @property
     def vanishing_points(self) -> []:
         return self._vanishing_points
 
     @property
     def corridors_repository(self):
         return self._corridors_repository
-
-    def read(self, width=None):
-        """
-        :raise EOFError when end of input
-        :return:
-        """
-
-        status, frame = self._input.read()
-
-        if not status:
-            raise EOFError
-
-        if width is not None:
-            return cv2.resize(frame, (width, int(width * self.ratio)))
-        elif self._resize:
-            return cv2.resize(frame, (self._width, self._height))
-        else:
-            return frame
-
-    def reopen(self):
-        self._input.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def draw_vanishing_points(self, image) -> np.ndarray:
         points = [(0, int(self.height)),

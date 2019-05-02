@@ -228,5 +228,9 @@ class Line:
 
         cv2.line(image, tuple(p1), tuple(p2), color, thickness)
 
+    def serialize(self):
+        return {"origin": self.origin,
+                "direction": self.direction}
+
     def __str__(self):
         return f'{self.a}x + {self.b}y + {self.c} = 0'
