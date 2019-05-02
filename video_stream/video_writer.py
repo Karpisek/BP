@@ -107,6 +107,8 @@ class ViolationWriter(ThreadedPipeBlock):
 
         with open(path, "w") as file:
             data = self._info.get_calibration()
+
+            print(data)
             json.dump(data, file)
 
     def _save_light_state(self, lights_state, seq):

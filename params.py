@@ -106,10 +106,10 @@ DEFAULT_THICKNESS = 1
 
 STATISTICS_LOG_FILENAME = "statistics.json"
 CALIBRATION_FILENAME = "calibration.json"
+ANNOTATIONS_FILENAME = "annotations.json"
 
 # helpers
 UINT_MIN = -2147483648
 UINT_MAX = 2147483647
 RANDOM_COLOR = [(np.random.randint(0, 50), np.random.randint(0, 50), np.random.randint(0, 50)) for _ in range(100)]
 COLOR_VANISHING_DIRECTIONS = [COLOR_GREEN, COLOR_BLUE, COLOR_RED]
-

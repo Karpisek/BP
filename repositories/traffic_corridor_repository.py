@@ -95,6 +95,9 @@ class TrafficCorridorRepository:
         red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
         return red_line_point[1] > coordinates.y
 
+    def __contains__(self, coordinates):
+        return self.get_corridor(coordinates) > 0 or not self._corridors_found
+
     def get_corridor(self, coordinates) -> int:
         if not self._corridors_found:
             return -1

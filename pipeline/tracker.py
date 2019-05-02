@@ -75,7 +75,7 @@ class Tracker(ThreadedPipeBlock):
             for detected_object in detected_objects:
                 coordinates, size, confident_score, class_id = detected_object
 
-                if self._info.start_area.contains(coordinates):
+                if coordinates in self._info.start_area:
                     self._tracked_object_repository.new_tracked_object(*detected_object)
 
     def _update_from_predictor(self, sequence_number) -> None:
@@ -137,7 +137,7 @@ class Tracker(ThreadedPipeBlock):
             if new_box[2] > params.TRACKER_MINIMAL_SCORE:
                 coordinates, size, confident_score, _ = new_box
 
-                if self._info.start_area.contains(coordinates):
+                if coordinates in self._info.start_area:
                     self._tracked_object_repository.new_tracked_object(*new_box)
 
 
