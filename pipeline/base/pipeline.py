@@ -23,12 +23,14 @@ class Mode(Enum):
 class PipeBlock:
     pipes = []
 
-    def __init__(self, pipe_id, output=None, queue_size=DEFAULT_QUEUE_SIZE, print_fps=False, work_modes=None):
+    def __init__(self, info, pipe_id, output=None, queue_size=DEFAULT_QUEUE_SIZE, print_fps=False, work_modes=None):
         self.id = pipe_id
         self._print_fps = print_fps
         self._mode = Mode.CALIBRATION
         self._previous_mode = Mode.CALIBRATION
+        self._info = info
 
+        self.seq = 0
         self._input = {}
         self._output = {}
 
@@ -51,7 +53,6 @@ class PipeBlock:
         self._run()
 
     def _run(self):
-        seq = 0
         frame_counter = 0
 
         clock = time.time()
@@ -60,18 +61,17 @@ class PipeBlock:
 
         try:
             while True:
-                seq += 1
+                self.seq += 1
 
                 if self._print_fps:
                     frame_counter += 1
                     if frame_counter > 100:
-                        print(f" {self.__class__.__name__} FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000))
+                        print(f"{self.__class__.__name__} FPS: ", 1000 / (((time.time() - clock) / frame_counter) * 1000))
+                        print(f"Video input progress: {round((self.seq / self._info.frame_count) * 100, 2)}%")
                         frame_counter = 0
                         clock = time.time()
 
-                # clock = time.time()
-                self._step(seq)
-                # print(f" {self.__class__.__name__} Time: ", time.time() - clock)
+                self._step(self.seq)
 
         except EOFError:
             self._after()
@@ -87,7 +87,7 @@ class PipeBlock:
         PipeBlock.pipes.remove(self)
 
     def _mode_changed(self, new_mode):
-        raise NotImplementedError
+        self.seq = 0
 
     def send(self, message, pipe_id, block=True):
         mode = self._mode
@@ -142,10 +142,10 @@ class PipeBlock:
 class ThreadedPipeBlock(PipeBlock):
 
     def _mode_changed(self, new_mode):
-        pass
+        super()._mode_changed(new_mode)
 
-    def __init__(self, pipe_id, output=None, max_steps=np.inf, work_modes=None, deamon=True):
-        super().__init__(pipe_id=pipe_id, output=output, work_modes=work_modes)
+    def __init__(self, info, pipe_id, output=None, max_steps=np.inf, work_modes=None, deamon=True):
+        super().__init__(info=info, pipe_id=pipe_id, output=output, work_modes=work_modes)
 
         self._thread = Thread(target=self._run)
         self._thread.daemon = deamon

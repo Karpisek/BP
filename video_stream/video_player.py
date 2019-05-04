@@ -13,13 +13,11 @@ class UserEndException(Exception):
 
 class VideoPlayer(PipeBlock):
     def __init__(self, info, print_fps, output):
-        super().__init__(pipe_id=params.VIDEO_PLAYER_ID, print_fps=print_fps, output=output)
+        super().__init__(info=info, pipe_id=params.VIDEO_PLAYER_ID, print_fps=print_fps, output=output)
 
         self._detector = None
         self._loader = None
         self._tracker = None
-
-        self._info = info
 
     def _mode_changed(self, new_mode):
         pass
@@ -38,8 +36,8 @@ class VideoPlayer(PipeBlock):
         #
         # if self.mode == Mode.CALIBRATION:
         #     # image_copy = self._info.draw_corridors(image_copy)
-        #     image_copy = self._info.draw_vanishing_points(image_copy)
-        #     image_copy = self._info.draw_detected_traffic_lights(image_copy)
+        image_copy = self._info.draw_vanishing_points(image_copy)
+        image_copy = self._info.draw_detected_traffic_lights(image_copy)
         #
         # elif self.mode == Mode.DETECTION:
         #     pass

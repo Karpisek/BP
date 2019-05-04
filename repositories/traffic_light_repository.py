@@ -84,6 +84,9 @@ class TrafficLightsRepository(Repository):
 
                 top_left = Coordinates(x_min, y_min, info=self._info)
                 bottom_right = Coordinates(x_max, y_max, info=self._info)
+
+                print(box)
+                print(top_left, bottom_right)
                 self.add_traffic_light(top_left=top_left, bottom_right=bottom_right)
                 break
 

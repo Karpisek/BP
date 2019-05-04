@@ -52,6 +52,9 @@ class TrafficCorridorRepository:
     def corridor_mask(self):
         return self._corridor_mask
 
+    def load_serialized(self, serialized_corridors):
+        raise NotImplementedError
+
     def select_manually(self, image):
         corridor_maker = CorridorMaker(image)
         stop_line_maker = StopLineMaker(image)
@@ -91,6 +94,9 @@ class TrafficCorridorRepository:
 
         red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
         return red_line_point[1] > coordinates.y
+
+    def __contains__(self, coordinates):
+        return self.get_corridor(coordinates) > 0 or not self._corridors_found
 
     def get_corridor(self, coordinates) -> int:
         if not self._corridors_found:
@@ -264,7 +270,7 @@ class TrafficCorridorRepository:
         self._stopline_found = True
 
     def serialize(self):
-        return {"corridors": "not implemented"}
+        return {"corridors": [corridor.serialize() for _, corridor in self._corridors.items()]}
 
 
 class TrafficCorridor:
@@ -307,6 +313,10 @@ class TrafficCorridor:
             self.right_line.draw(image=image,
                                  color=color,
                                  thickness=5)
+
+    def serialize(self):
+        return {"left_line": self.left_line.serialize(),
+                "right_line": self.right_line.serialize()}
 
     def __str__(self):
         return f"corridor: id [{self.id}]"

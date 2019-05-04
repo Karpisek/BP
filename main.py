@@ -39,7 +39,7 @@ def main(argv):
 
     program_arguments = InputParser(argv=argv)
 
-    video_info = Info(video_path=VIDEO_PATH,
+    video_info = Info(video_path=program_arguments.input_video,
                       light_detection_model=PATH_TO_LIGHTS_MODEL,
                       program_arguments=program_arguments)
 
@@ -52,7 +52,7 @@ def main(argv):
 
     # calibrator
     calibrator = Calibrator(info=video_info,
-                            output=[video_player])
+                            output=[])
 
     # observer
     observer = Observer(info=video_info,

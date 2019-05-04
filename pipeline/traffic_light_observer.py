@@ -11,9 +11,8 @@ class TrafficLightsObserver(ThreadedPipeBlock):
     colors = [Color.RED_ORANGE, Color.RED, Color.ORANGE, Color.GREEN]
 
     def __init__(self, info, output):
-        super().__init__(output=output, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+        super().__init__(info=info, output=output, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
 
-        self._info = info
         self._state = None
         self._state_values = [0, 0, 0]
 
@@ -22,6 +21,8 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         self._state_candidate_count = 0
 
     def _mode_changed(self, new_mode):
+        super()._mode_changed(new_mode)
+
         if new_mode == Mode.DETECTION:
             self._state = None
             self._state_values = [0, 0, 0]

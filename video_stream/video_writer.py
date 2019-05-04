@@ -19,11 +19,10 @@ from repositories.traffic_light_repository import Color
 class ViolationWriter(ThreadedPipeBlock):
 
     def _mode_changed(self, new_mode):
-        pass
+        super()._mode_changed(new_mode)
 
     def __init__(self, info, program_arguments):
-        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
-        self._info = info
+        super().__init__(info=info, pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
         self._video_writers = {}
         self._captured_ids = []
         self._light_states = {"red": [],
@@ -94,7 +93,7 @@ class ViolationWriter(ThreadedPipeBlock):
 
     def _write_statistics(self):
         if self._last_boxes_repository is not None:
-            path = f"{self._path}/{params.STATISTICS_LOG_FILENAME}"
+            path = f"{self._path}/{str(self._info.calibration_mode)}_{params.STATISTICS_LOG_FILENAME}"
 
             with open(path, "w") as file:
                 data = self._last_boxes_repository.get_statistics()
@@ -103,10 +102,12 @@ class ViolationWriter(ThreadedPipeBlock):
                 json.dump(data, file)
 
     def _write_calibration(self):
-        path = f"{self._path}/{params.CALIBRATION_FILENAME}"
+        path = f"{self._path}/{str(self._info.calibration_mode)}_{params.CALIBRATION_FILENAME}"
 
         with open(path, "w") as file:
             data = self._info.get_calibration()
+
+            print(data)
             json.dump(data, file)
 
     def _save_light_state(self, lights_state, seq):
@@ -134,7 +135,8 @@ class VideoWriter:
         self._path = f"{path}/{car_id}"
         self._car_id = car_id
         self._info = info
-        self._output = cv2.VideoWriter(self._path + ".avi", cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), self._info.fps, (self._info.width, self._info.height))
+        self._output = cv2.VideoWriter(self._path + ".avi", cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), self._info.fps,
+                                       (self._info.width, self._info.height))
         self._lifetime = 2 * len(image_history)
         self._annotation_output = {"top_left": [],
                                    "bottom_right": [],

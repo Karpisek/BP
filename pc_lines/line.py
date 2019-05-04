@@ -169,7 +169,7 @@ class Line:
 
         return np.abs(self.a * x + self.b * y + self.c)/np.sqrt(self.a ** 2 + self.b ** 2)
 
-    def general_equation(self)-> (float, float, float):
+    def general_equation(self) -> (float, float, float):
         # ax + by + c = 0
         return self.a, self.b, self.c
 
@@ -227,6 +227,10 @@ class Line:
         p2 = int(np.clip(p2[0], params.UINT_MIN, params.UINT_MAX)), int(np.clip(p2[1], params.UINT_MIN, params.UINT_MAX))
 
         cv2.line(image, tuple(p1), tuple(p2), color, thickness)
+
+    def serialize(self):
+        return {"origin": (int(self.origin[0]), int(self.origin[1])),
+                "direction": (int(self.direction[0]), int(self.direction[1]))}
 
     def __str__(self):
         return f'{self.a}x + {self.b}y + {self.c} = 0'

@@ -29,7 +29,7 @@ class Area:
     def anchors(self):
         return self._top_left, self._bot_right
 
-    def contains(self, coordinates) -> bool:
+    def __contains__(self, coordinates):
         if not self.defined:
             return False
 
