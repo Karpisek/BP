@@ -16,13 +16,13 @@ from video_stream.video_writer import ViolationWriter
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00002.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/v2.mp4"
 
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
+VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1b.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/2b.mp4"
-VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3a.mp4"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/3b.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
@@ -39,7 +39,7 @@ def main(argv):
 
     program_arguments = InputParser(argv=argv)
 
-    video_info = Info(video_path=VIDEO_PATH,
+    video_info = Info(video_path=program_arguments.input_video,
                       light_detection_model=PATH_TO_LIGHTS_MODEL,
                       program_arguments=program_arguments)
 
@@ -52,7 +52,7 @@ def main(argv):
 
     # calibrator
     calibrator = Calibrator(info=video_info,
-                            output=[video_player])
+                            output=[])
 
     # observer
     observer = Observer(info=video_info,

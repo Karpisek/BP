@@ -96,11 +96,11 @@ class Box2D:
                     self._behaviour = CarBehaviourMode.ORANGE_DRIVER
 
             if lights_state == Color.GREEN and self._behaviour not in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER]:
-                if info.corridors_repository.behind_line(self.tracker_point):
+                if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
                     self._behaviour = CarBehaviourMode.LINE_CROSSED
 
-        if self._red_distance_traveled > params.OBSERVER_RED_STANDER_MAX_TRAVEL:
-            self._behaviour = CarBehaviourMode.RED_DRIVER
+        # if self._red_distance_traveled > params.OBSERVER_RED_STANDER_MAX_TRAVEL:
+        #     self._behaviour = CarBehaviourMode.RED_DRIVER
 
         return self._behaviour
 
@@ -272,13 +272,15 @@ class Observer(ThreadedPipeBlock):
     def __init__(self, info, output, pipe_id=params.OBSERVER_ID):
 
         super().__init__(pipe_id=pipe_id,
-                         output=output)
+                         output=output,
+                         info=info)
 
-        self._info = info
         self._previous_lights_state = None
         self._bounding_boxes_repository = BBoxRepository()
 
     def _mode_changed(self, new_mode):
+        super()._mode_changed(new_mode)
+
         if new_mode == Mode.DETECTION:
             self._bounding_boxes_repository.restart()
 

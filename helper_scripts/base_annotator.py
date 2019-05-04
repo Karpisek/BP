@@ -40,14 +40,7 @@ class BaseAnnotator:
             with open(self.directory_output + "/" + params.ANNOTATIONS_FILENAME, "r") as file:
                 self.annotations = json.load(file)
         except FileNotFoundError:
-            self.annotations = {"cars": [],
-                                "lights": {
-                                    "green": [],
-                                    "orange": [],
-                                    "red": [],
-                                    "red_orange": []
-                                },
-                                "violations": []}
+            self.clear_annotations()
 
     def run(self):
         seq = 0
@@ -84,3 +77,12 @@ class BaseAnnotator:
         with open(self.directory_output + "/" + params.ANNOTATIONS_FILENAME, "w") as file:
             json.dump(self.annotations, file)
 
+    def clear_annotations(self):
+        self.annotations = {"cars": [],
+                            "lights": {
+                                "green": [],
+                                "orange": [],
+                                "red": [],
+                                "red_orange": []
+                            },
+                            "violations": []}

@@ -19,14 +19,15 @@ class SyncError(Exception):
 class Calibrator(ThreadedPipeBlock):
 
     def __init__(self, output=None, info=None):
-        super().__init__(pipe_id=params.CALIBRATOR_ID, output=output)
+        super().__init__(info=info, pipe_id=params.CALIBRATOR_ID, output=output)
 
         self._pc_lines = PcLines(info.width)
-        self._info = info
 
         self._detected_lines = []
 
     def _mode_changed(self, new_mode):
+        super()._mode_changed(new_mode)
+
         if new_mode == Mode.DETECTION:
             raise EOFError
 

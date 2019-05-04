@@ -13,12 +13,11 @@ def transpose_matrix(matrix):
 
 class Tracker(ThreadedPipeBlock):
     def __init__(self, info, output=None):
-        super().__init__(pipe_id=params.TRACKER_ID, output=output)
+        super().__init__(info=info, pipe_id=params.TRACKER_ID, output=output)
 
         self.new_positions = []
         self.old_positions = []
 
-        self._info = info
         self._points_to_track = None
 
         self._tracked_object_repository = TrackedObjectsRepository(info)
@@ -27,6 +26,8 @@ class Tracker(ThreadedPipeBlock):
         self._munkres = Munkres()
 
     def _mode_changed(self, new_mode):
+        super()._mode_changed(new_mode)
+
         if new_mode == Mode.DETECTION:
             self._tracked_object_repository.restart()
 

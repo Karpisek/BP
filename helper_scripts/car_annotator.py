@@ -18,14 +18,23 @@ class CarAnnotator(BaseAnnotator):
                 elif k == 99:
                     self._add_annotation("cars", seq)
 
+                elif k == 118:
+                    self._add_annotation("cars", seq)
+                    self._add_annotation("violations", seq)
+
         elif k == 113:
             raise EOFError
 
         elif k == 99:
             self._add_annotation("cars", seq)
 
+        elif k == 118:
+            self._add_annotation("violations", seq)
+            self._add_annotation("cars", seq)
+
     def _before(self):
         self.annotations["cars"] = []
+        self.annotations["violations"] = []
 
 
 annotator = CarAnnotator()

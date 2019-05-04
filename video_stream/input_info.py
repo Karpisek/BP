@@ -31,7 +31,12 @@ class VideoInfo:
         self._height = self._input.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self._width = self._input.get(cv2.CAP_PROP_FRAME_WIDTH)
         self._resize = False
-        self._frame_count = self._input.get(cv2.CAP_PROP_FRAME_COUNT)
+
+        try:
+            self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT) / int(self._fps / params.FRAME_LOADER_MAX_FPS))
+        except ZeroDivisionError:
+            self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT))
+
         self._ratio = self._height / self._width
 
         if self._width > params.FRAME_LOADER_MAX_WIDTH:
@@ -68,12 +73,14 @@ class VideoInfo:
         status, frame = self._input.read()
 
         for _ in range(int(self.fps / params.FRAME_LOADER_MAX_FPS)):
-            status, image = self._input.read()
+            status, frame = self._input.read()
 
         if not status:
             raise EOFError
 
         if width is not None:
+            print(frame.shape)
+            print(width, int(width*self.ratio))
             return cv2.resize(frame, (width, int(width * self.ratio)))
         elif self._resize:
             return cv2.resize(frame, (self._width, self._height))

@@ -20,7 +20,7 @@ class InputParser:
         self._output = None
 
         for opt, arg in opts:
-                
+
             if opt in ("-l", "--light"):
                 self._light = True
 

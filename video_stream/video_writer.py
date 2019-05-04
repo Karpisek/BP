@@ -19,11 +19,10 @@ from repositories.traffic_light_repository import Color
 class ViolationWriter(ThreadedPipeBlock):
 
     def _mode_changed(self, new_mode):
-        pass
+        super()._mode_changed(new_mode)
 
     def __init__(self, info, program_arguments):
-        super().__init__(pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
-        self._info = info
+        super().__init__(info=info, pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
         self._video_writers = {}
         self._captured_ids = []
         self._light_states = {"red": [],

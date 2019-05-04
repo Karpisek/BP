@@ -10,8 +10,7 @@ from pipeline.base.pipeline import is_frequency, Mode
 class FrameLoader(ThreadedPipeBlock):
 
     def __init__(self, output, info):
-        super().__init__(pipe_id=params.FRAME_LOADER_ID, output=output)
-        self._info = info
+        super().__init__(info=info, pipe_id=params.FRAME_LOADER_ID, output=output)
 
     def _before(self):
         if not self._info.traffic_lights_repository.ready:
@@ -21,6 +20,8 @@ class FrameLoader(ThreadedPipeBlock):
             self._info.reopen()
 
     def _mode_changed(self, new_mode):
+        super()._mode_changed(new_mode)
+
         if new_mode == Mode.DETECTION:
             self._info.reopen()
 

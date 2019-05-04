@@ -13,8 +13,7 @@ class Detector(ThreadedPipeBlock):
 
     def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True, max_steps=np.inf):
 
-        super().__init__(pipe_id=detector_type_id, output=output, max_steps=max_steps)
-        self._info = info
+        super().__init__(info=info, pipe_id=detector_type_id, output=output, max_steps=max_steps)
         self.detection_graph = tf.Graph()
         self._block = block
 
