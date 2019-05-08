@@ -191,6 +191,7 @@ class BBoxRepository:
         if behaviour in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER, CarBehaviourMode.LINE_CROSSED]:
             if car_id not in self._all_cars:
                 self._all_cars[car_id] = seq
+                print(car_id)
 
         if behaviour == CarBehaviourMode.RED_DRIVER:
             try:

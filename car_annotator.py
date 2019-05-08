@@ -1,12 +1,12 @@
 import cv2
 
-from helper_scripts.base_annotator import BaseAnnotator
+from base_annotator import BaseAnnotator
 
 
 class CarAnnotator(BaseAnnotator):
     def _step(self, seq, image):
         cv2.imshow(self.video_info.filename, image)
-        k = cv2.waitKey(100)
+        k = cv2.waitKey(60)
 
         if k == 32:
             while True:
@@ -18,9 +18,8 @@ class CarAnnotator(BaseAnnotator):
                 elif k == 99:
                     self._add_annotation("cars", seq)
 
-                elif k == 118:
-                    self._add_annotation("cars", seq)
-                    self._add_annotation("violations", seq)
+                elif k == 8:
+                    self.annotations["cars"].pop()
 
         elif k == 113:
             raise EOFError
@@ -28,13 +27,11 @@ class CarAnnotator(BaseAnnotator):
         elif k == 99:
             self._add_annotation("cars", seq)
 
-        elif k == 118:
-            self._add_annotation("violations", seq)
-            self._add_annotation("cars", seq)
+        elif k == 8:
+            self.annotations["cars"].pop()
 
     def _before(self):
         self.annotations["cars"] = []
-        self.annotations["violations"] = []
 
 
 annotator = CarAnnotator()

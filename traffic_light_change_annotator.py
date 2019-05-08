@@ -1,6 +1,8 @@
 import cv2
 
-from helper_scripts.base_annotator import BaseAnnotator
+from base_annotator import BaseAnnotator
+
+state = 0
 
 
 class LightAnnotator(BaseAnnotator):
@@ -43,7 +45,12 @@ class LightAnnotator(BaseAnnotator):
             self._add_annotation("lights", seq, "red_orange")
 
     def _before(self):
-        self.annotations["lights"] = []
+        self.annotations["lights"] = {
+                                "green": [],
+                                "orange": [],
+                                "red": [],
+                                "red_orange": []
+                            }
 
 
 annotator = LightAnnotator()

@@ -20,7 +20,7 @@ class VideoPlayer(PipeBlock):
         self._tracker = None
 
     def _mode_changed(self, new_mode):
-        pass
+        super()._mode_changed(new_mode)
 
     def _before(self):
         pass
@@ -56,6 +56,10 @@ class VideoPlayer(PipeBlock):
         #  commands
         if key & 0xFF == ord("q"):
             raise EOFError
+
+        if key & 0xFF == ord("p"):
+            cv2.imwrite("/Users/miro/Desktop/bp_photos/corridors.png", image_copy)
+
         else:
             self.send(None, params.VIOLATION_WRITER_ID)
 

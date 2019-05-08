@@ -138,7 +138,7 @@ class Calibrator(ThreadedPipeBlock):
         mask = TrackedObject.draw_lifelines(image=mask,
                                             lifelines=filtered_lifelines,
                                             color=params.COLOR_LIFELINE,
-                                            thickness=params.CALIBRATOR_LIFELINE_THICKNESS)
+                                            thickness=100)
 
         self._info.corridors_repository.find_corridors(lifelines_mask=mask,
                                                        vp1=self._info.vanishing_points[0])

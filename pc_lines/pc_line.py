@@ -56,8 +56,8 @@ class PcLines:
 
     def find_most_lines_cross(self):
 
-        pyplot.xlim((-2 * self.delta, 2 * self.delta))
-        pyplot.ylim((-2 * self.delta, 2 * self.delta))
+        # pyplot.xlim((-2 * self.delta, 2 * self.delta))
+        # pyplot.ylim((-2 * self.delta, 2 * self.delta))
 
         line, ratio = ransac(creator_points=self.s_points,
                              voting_points=self.s_points,
@@ -67,10 +67,10 @@ class PcLines:
             u1, v1 = line.find_coordinate(x=0)
             u2, v2 = line.find_coordinate(x=self.delta)
 
-            pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
-            self.plot()
+            # pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
+            # self.plot()
 
-            pyplot.show()
+            # pyplot.show()
 
             print("ratio:", ratio)
 
@@ -80,16 +80,14 @@ class PcLines:
             u1, v1 = line.find_coordinate(y=0)
             angle = (u1 + self.delta) * 180 / (2 * self.delta)
 
-            pyplot.plot([line.find_coordinate(y=-2 * self.delta)[0], line.find_coordinate(y=2 * self.delta)[0]], [line.find_coordinate(y=-2 * self.delta)[1], line.find_coordinate(y=2 * self.delta)[1]])
-            self.plot()
+            # pyplot.plot([line.find_coordinate(y=-2 * self.delta)[0], line.find_coordinate(y=2 * self.delta)[0]], [line.find_coordinate(y=-2 * self.delta)[1], line.find_coordinate(y=2 * self.delta)[1]])
+            # self.plot()
 
-            pyplot.show()
+            # pyplot.show()
 
             print("ratio:", ratio)
 
             return angle, None
-
-
 
     def pc_points(self, points=None, angles=None) -> [Line]:
         created_lines = []

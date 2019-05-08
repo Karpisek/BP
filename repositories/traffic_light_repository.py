@@ -9,10 +9,10 @@ from bbox import Coordinates
 from repositories.base.repository import Repository
 
 
-class Color(IntEnum):
-    RED = 0
-    RED_ORANGE = 1
-    ORANGE = 2
+class Color(IntEnum): # RED, RED_ORANGE_ ORANDG
+    ORANGE = 0
+    RED = 1
+    RED_ORANGE = 2
     GREEN = 3
     NONE = 4
 

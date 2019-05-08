@@ -32,10 +32,7 @@ class VideoInfo:
         self._width = self._input.get(cv2.CAP_PROP_FRAME_WIDTH)
         self._resize = False
 
-        try:
-            self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT) / int(self._fps / params.FRAME_LOADER_MAX_FPS))
-        except ZeroDivisionError:
-            self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT))
+        self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT) / (int(self._fps / params.FRAME_LOADER_MAX_FPS) + 1))
 
         self._ratio = self._height / self._width
 
@@ -107,7 +104,7 @@ class Info(VideoInfo):
         self._solve_program_arguments(program_arguments)
 
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height/3),
+                                        top_left=Coordinates(0, self.height/2),
                                         bottom_right=Coordinates(self.width, self.height))
 
         self._tracker_update_area = Area(info=self,

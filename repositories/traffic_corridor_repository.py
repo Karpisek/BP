@@ -143,7 +143,7 @@ class TrafficCorridorRepository:
                 if point1[0] > point2[0]:
                     continue
                 else:
-                    middle_point = int((point1[0] + point2[0])/2), int((point1[1] + point2[1])/2)
+                    middle_point = int((point1[0] + point2[0]) / 2), int((point1[1] + point2[1]) / 2)
                     break
 
         new_corridor = TrafficCorridor(index=self._corridors_count,
@@ -158,7 +158,6 @@ class TrafficCorridorRepository:
                                    color=self._corridors_count)
 
     def find_corridors(self, lifelines_mask, vp1):
-
         # extract left-bot-right 1px border around lifeline image and make "1D array"
         left_edge = lifelines_mask[:, :1]
         bottom_edge = lifelines_mask[-1:, :].transpose(1, 0, 2)
@@ -170,6 +169,7 @@ class TrafficCorridorRepository:
 
         edge_grey_blured = cv2.medianBlur(edge_grey, 31)
         _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+        threshold = cv2.dilate(threshold, (5, 5), iterations=5)
 
         # edge_grey_blured = cv2.medianBlur(threshold, 21)
         # _, threshold = cv2.threshold(edge_grey_blured, 10, 255, cv2.THRESH_BINARY)
@@ -220,10 +220,10 @@ class TrafficCorridorRepository:
                                      right_line=Line(right_bottom, right_top))
 
         # cv2.imwrite("mask.jpg", self.get_mask())
-        cv2.imwrite("lifeline.jpg", frame_edge)
-        cv2.imwrite("lifeline_before.jpg", lifelines_mask)
+        cv2.imwrite("lifeline.jpg", lifelines_mask)
 
-        self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask, mask=self._info.update_area.mask())
+        self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask,
+                                              mask=self._info.update_area.mask())
         self._corridors_found = True
 
     def add_stop_point(self, coordinates):
@@ -484,4 +484,3 @@ class CorridorMaker(LineDrag):
 
             if key == 8:
                 self.erase_last()
-
