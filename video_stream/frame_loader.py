@@ -22,11 +22,11 @@ class FrameLoader(ThreadedPipeBlock):
     def _mode_changed(self, new_mode):
         super()._mode_changed(new_mode)
 
-        if new_mode == Mode.DETECTION:
+        if new_mode in [Mode.DETECTION, Mode.CALIBRATION_CORRIDORS]:
             self._info.reopen()
 
     def _step(self, seq):
-        if self._mode == Mode.CALIBRATION and self._info.calibrated:
+        if self._mode == Mode.CALIBRATION_VP and self._info.calibrated:
             self._update_mode(Mode.DETECTION)
 
         image = self._info.read()

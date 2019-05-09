@@ -46,7 +46,7 @@ class Calibrator(ThreadedPipeBlock):
             # elif len(self._info.vanishing_points) < 3:
             #     self.calculate_third_vp()
 
-            elif len(lifelines) > params.CORRIDORS_MINIMUM_LIFELINES:
+            elif len(TrackedObject.filter_lifelines(lifelines, self._info.vp1)) > params.CORRIDORS_MINIMUM_LIFELINES:
                 self.find_corridors(lifelines)
 
     def detect_first_vp(self, lifelines):

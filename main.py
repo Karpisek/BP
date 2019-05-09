@@ -28,6 +28,8 @@ from video_stream.video_writer import ViolationWriter
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548342000.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
+VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
+
 
 PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd2.pb'
 # PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd_car_detection_model.pb'

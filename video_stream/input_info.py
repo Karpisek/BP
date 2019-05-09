@@ -108,7 +108,7 @@ class Info(VideoInfo):
                                         bottom_right=Coordinates(self.width, self.height))
 
         self._tracker_update_area = Area(info=self,
-                                         top_left=Coordinates(0, self.height/4),
+                                         top_left=Coordinates(0, self.height/3),
                                          bottom_right=Coordinates(self.width, self.height))
 
         print(f"INFO: fps: {self.fps}, height: {self.height}, width: {self.width}, frame count: {self.frame_count}")

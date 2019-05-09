@@ -14,8 +14,9 @@ def is_frequency(seq, frequency):
 
 
 class Mode(Enum):
-    CALIBRATION = 0,
-    DETECTION = 1
+    CALIBRATION_VP = 0,
+    CALIBRATION_CORRIDORS = 1,
+    DETECTION = 2,
     SIGNAL = 3,
     END = 4,
 
@@ -26,8 +27,8 @@ class PipeBlock:
     def __init__(self, info, pipe_id, output=None, queue_size=DEFAULT_QUEUE_SIZE, print_fps=False, work_modes=None):
         self.id = pipe_id
         self._print_fps = print_fps
-        self._mode = Mode.CALIBRATION
-        self._previous_mode = Mode.CALIBRATION
+        self._mode = Mode.CALIBRATION_VP
+        self._previous_mode = Mode.CALIBRATION_VP
         self._info = info
 
         self.seq = 0
@@ -35,7 +36,7 @@ class PipeBlock:
         self._output = {}
 
         if work_modes is None:
-            work_modes = [Mode.CALIBRATION, Mode.DETECTION]
+            work_modes = [Mode.CALIBRATION_VP, Mode.CALIBRATION_CORRIDORS, Mode.DETECTION]
 
         work_modes.append(Mode.SIGNAL)
 

@@ -112,9 +112,8 @@ class TrackedObjectsRepository:
         for tracked_object in self._tracked_objects:
             if tracked_object.id not in self._collected_lifelines_id:
                 if tracked_object.tracker_point not in self._info.update_area:
-                    if tracked_object.history.y > tracked_object.tracker_point.y:
-                        self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
-                        self._collected_lifelines_id.append(tracked_object.id)
+                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+                    self._collected_lifelines_id.append(tracked_object.id)
 
             if tracked_object.tracker_point not in self._info.corridors_repository or tracked_object.tracker_point not in self._info.update_area:
                 self._tracked_objects.remove(tracked_object)
@@ -184,6 +183,10 @@ class TrackedObject:
 
             if 30 < lifeline_line.angle(line_to_vp) < 150:
                 continue
+
+            elif lifeline[0][1] < lifeline[1][1]:
+                continue
+
             else:
                 filtered.append(lifeline)
 
@@ -235,7 +238,7 @@ class TrackedObject:
             [np.float32(0)],  # dy
         ])
 
-        self._start_coordinates = self.center
+        self._history = [self.center]
 
     @property
     def flow(self):
