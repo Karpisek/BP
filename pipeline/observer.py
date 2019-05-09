@@ -6,6 +6,7 @@ import cv2
 import params
 import numpy as np
 from detectors import Coordinates
+from pc_lines.line import ransac
 from pipeline import ThreadedPipeBlock, is_frequency
 from pipeline.base.pipeline import Mode
 from pipeline.traffic_light_observer import Color
@@ -28,6 +29,7 @@ class Box2D:
         self._behaviour = CarBehaviourMode.NORMAL
 
         self._lifetime = 1
+        self._history = []
 
     @property
     def behaviour(self):
@@ -99,12 +101,12 @@ class Box2D:
                 if info.corridors_repository.line_crossed(previous_coordinates, self.tracker_point):
                     self._behaviour = CarBehaviourMode.LINE_CROSSED
 
-        # if self._red_distance_traveled > params.OBSERVER_RED_STANDER_MAX_TRAVEL:
-        #     self._behaviour = CarBehaviourMode.RED_DRIVER
+        if not len(self._history) or np.abs(self.center_point.y - self._history[-1].y) > 20:
+            self._history.append(self.center_point)
 
         return self._behaviour
 
-    def draw(self, image):
+    def draw(self, image, draw_trajectories):
         if self._behaviour == CarBehaviourMode.RED_DRIVER:
             color = params.COLOR_RED
         elif self._behaviour == CarBehaviourMode.ORANGE_DRIVER:
@@ -137,6 +139,30 @@ class Box2D:
                     fontScale=1,
                     color=params.COLOR_BLACK,
                     thickness=2)
+
+        if draw_trajectories:
+            for index, point in enumerate(self._history):
+                cv2.circle(img=image,
+                           center=point.tuple(),
+                           color=params.COLOR_BLUE,
+                           radius=3,
+                           thickness=params.FILL)
+
+                try:
+                    cv2.line(img=image,
+                             pt1=point.tuple(),
+                             pt2=self._history[index + 1].tuple(),
+                             color=params.COLOR_BLUE,
+                             thickness=1)
+
+                except IndexError:
+                    pass
+
+            position_history = [coordinates.tuple() for coordinates in self._history]
+            line, value = ransac(position_history, position_history, 1)
+
+            if line is not None and value > 5:
+                line.draw(image, params.COLOR_RED, 1)
 
     def __str__(self):
         return f"[Box id: {self._car_id}]"
@@ -191,7 +217,6 @@ class BBoxRepository:
         if behaviour in [CarBehaviourMode.ORANGE_DRIVER, CarBehaviourMode.RED_DRIVER, CarBehaviourMode.LINE_CROSSED]:
             if car_id not in self._all_cars:
                 self._all_cars[car_id] = seq
-                print(car_id)
 
         if behaviour == CarBehaviourMode.RED_DRIVER:
             try:
@@ -212,9 +237,9 @@ class BBoxRepository:
             if box.lifetime < 0:
                 self._boxes.pop(key)
 
-    def draw(self, image):
+    def draw(self, image, draw_trajectories):
         for key, box in self._boxes.items():
-            box.draw(image)
+            box.draw(image, draw_trajectories)
 
         return image
 
@@ -295,7 +320,7 @@ class Observer(ThreadedPipeBlock):
 
         self._bounding_boxes_repository.check_lifetime()
 
-        if self._previous_lights_state == Color.RED_ORANGE and current_lights_state == Color.GREEN:
+        if self._previous_lights_state in [Color.RED_ORANGE, Color.RED] and current_lights_state == Color.GREEN:
             if not self._info.corridors_repository.stopline_found:
                 boxes_in_corridors = self._bounding_boxes_repository.get_boxes_in_corridors(info=self._info)
 

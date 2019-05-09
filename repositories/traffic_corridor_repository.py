@@ -71,6 +71,9 @@ class TrafficCorridorRepository:
             self.create_new_corridor(left_line=line1,
                                      right_line=line2)
 
+        self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask,
+                                              mask=self._info.update_area.mask())
+
         most_left_selection = selected_corridors[0]
         most_right_selection = selected_corridors[-1]
 
@@ -142,6 +145,9 @@ class TrafficCorridorRepository:
             for point2 in right_edge_points:
                 if point1[0] > point2[0]:
                     continue
+                if point1[1] == 0 or point2[1] == 0:
+                    continue
+
                 else:
                     middle_point = int((point1[0] + point2[0]) / 2), int((point1[1] + point2[1]) / 2)
                     break
@@ -153,6 +159,12 @@ class TrafficCorridorRepository:
 
         self._corridors[new_corridor.id] = new_corridor
 
+        # image = np.zeros(shape=(self._info.height, self._info.width), dtype=np.uint8)
+
+        # left_line.draw(image, thickness=1, color=255)
+        # right_line.draw(image, thickness=1, color=255)
+
+        # cv2.imwrite("test.jpg", image)
         new_corridor.draw_corridor(image=self._corridor_mask,
                                    info=self._info,
                                    color=self._corridors_count)
@@ -167,8 +179,8 @@ class TrafficCorridorRepository:
         # greyscale image and reduce noise by multiple blur and threshold
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
-        edge_grey_blured = cv2.medianBlur(edge_grey, 31)
-        _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+        edge_grey_blured = cv2.medianBlur(edge_grey, 11)
+        _, threshold = cv2.threshold(edge_grey_blured, 100, 255, cv2.THRESH_BINARY)
         threshold = cv2.dilate(threshold, (5, 5), iterations=5)
 
         # edge_grey_blured = cv2.medianBlur(threshold, 21)

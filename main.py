@@ -13,7 +13,7 @@ from video_stream.video_writer import ViolationWriter
 # VIDEO_PATH = "/Users/miro/Desktop/00004.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/x.mov"
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/right_camera/00003.MTS"
-# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00002.MTS"
+# VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/RedLightViolation/zoom_camera/00001.MTS"
 # VIDEO_PATH = "/Users/miro/Desktop/v2.mp4"
 
 # VIDEO_PATH = "/Volumes/Miro/FIT/BP/Dataset/iARTIST_crossroads/1.mp4"
@@ -28,7 +28,7 @@ from video_stream.video_writer import ViolationWriter
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548565201.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548342000.mp4"
 # VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
-VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
+# VIDEO_PATH = "/Volumes/KINGSTON/cam5-1548518400.mp4"
 
 
 PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd2.pb'

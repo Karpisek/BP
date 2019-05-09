@@ -21,10 +21,6 @@ def ransac(creator_points, voting_points, ransac_threshold):
     best_line_average_distance = np.inf
     best_line = None
 
-    print(len(creator_points))
-    print(len(voting_points))
-    print("threshold: ", ransac_threshold)
-
     for point1 in creator_points:
         for point2 in creator_points:
             try:

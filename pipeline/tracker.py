@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import params
 
 from bbox import TrackedObjectsRepository
@@ -28,8 +30,7 @@ class Tracker(ThreadedPipeBlock):
     def _mode_changed(self, new_mode):
         super()._mode_changed(new_mode)
 
-        if new_mode == Mode.DETECTION:
-            self._tracked_object_repository.restart()
+        self._tracked_object_repository.restart()
 
     def _step(self, seq):
         if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):
@@ -38,7 +39,16 @@ class Tracker(ThreadedPipeBlock):
         else:
             self._update_from_predictor(seq)
 
-        self._tracked_object_repository.control_boxes()
+        self._tracked_object_repository.control_boxes(self._info)
+
+        if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+            self._send_message(target=params.CALIBRATOR_ID,
+                               sequence_number=seq,
+                               block=False)
+
+        if is_frequency(seq, params.OBSERVER_FREQUENCY):
+            self._send_message(target=params.OBSERVER_ID,
+                               sequence_number=seq)
 
     def _send_message(self, target, sequence_number, block=True):
         message = None
@@ -51,7 +61,7 @@ class Tracker(ThreadedPipeBlock):
         elif target == params.CALIBRATOR_ID:
             outer_masks = self._tracked_object_repository.all_boxes_mask(area_size="outer")
             outer_masks_no_border = self._tracked_object_repository.all_boxes_mask(area_size="small-outer")
-            lifelines = self._tracked_object_repository.lifelines
+            lifelines = deepcopy(self._tracked_object_repository.lifelines)
 
             message = sequence_number, outer_masks, outer_masks_no_border, lifelines
 
@@ -86,15 +96,6 @@ class Tracker(ThreadedPipeBlock):
         if is_frequency(sequence_number, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
             _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
-
-        if is_frequency(sequence_number, params.CALIBRATOR_FREQUENCY):
-            self._send_message(target=params.CALIBRATOR_ID,
-                               sequence_number=sequence_number,
-                               block=False)
-
-        if is_frequency(sequence_number, params.OBSERVER_FREQUENCY):
-            self._send_message(target=params.OBSERVER_ID,
-                               sequence_number=sequence_number)
 
     def _hungarian_method(self, detected_boxes) -> None:
 

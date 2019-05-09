@@ -14,6 +14,10 @@ class FrameLoader(ThreadedPipeBlock):
 
     def _before(self):
         if not self._info.traffic_lights_repository.ready:
+
+            for _ in range(200):
+                self._info.read()
+
             image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
 
             self._info.traffic_lights_repository.find(image=image)
@@ -26,7 +30,10 @@ class FrameLoader(ThreadedPipeBlock):
             self._info.reopen()
 
     def _step(self, seq):
-        if self._mode == Mode.CALIBRATION_VP and self._info.calibrated:
+        if self._mode == Mode.CALIBRATION_VP and self._info.corridors_repository.corridors_found:
+            self._update_mode(Mode.CALIBRATION_CORRIDORS)
+
+        if self._mode == Mode.CALIBRATION_CORRIDORS and self._info.calibrated:
             self._update_mode(Mode.DETECTION)
 
         image = self._info.read()

@@ -100,20 +100,23 @@ class Info(VideoInfo):
         self._detect_vanishing_points = True
         self._calibration_mode = CalibrationMode.AUTOMATIC
 
-        # solve given program arguments
-        self._solve_program_arguments(program_arguments)
-
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height/2),
+                                        top_left=Coordinates(0, self.height / 2),
                                         bottom_right=Coordinates(self.width, self.height))
 
         self._tracker_update_area = Area(info=self,
-                                         top_left=Coordinates(0, self.height/3),
+                                         top_left=Coordinates(0, self.height / 4),
                                          bottom_right=Coordinates(self.width, self.height))
+
+        # solve given program arguments
+        self._solve_program_arguments(program_arguments)
 
         print(f"INFO: fps: {self.fps}, height: {self.height}, width: {self.width}, frame count: {self.frame_count}")
 
     def _solve_program_arguments(self, program_arguments):
+
+        for _ in range(200):
+            self.read()
 
         image = self.read()
         self.reopen()

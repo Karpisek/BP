@@ -72,8 +72,6 @@ class PcLines:
 
             # pyplot.show()
 
-            print("ratio:", ratio)
-
             return v1, v2
 
         except NotOnLineError:
@@ -84,8 +82,6 @@ class PcLines:
             # self.plot()
 
             # pyplot.show()
-
-            print("ratio:", ratio)
 
             return angle, None
 

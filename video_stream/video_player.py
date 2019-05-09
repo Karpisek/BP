@@ -32,7 +32,7 @@ class VideoPlayer(PipeBlock):
 
         image_copy = np.copy(image)
 
-        image = boxes_repository.draw(image)
+        image = boxes_repository.draw(image, draw_trajectories=False)
         #
         # if self.mode == Mode.CALIBRATION:
         #     # image_copy = self._info.draw_corridors(image_copy)

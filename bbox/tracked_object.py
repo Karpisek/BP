@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import cv2
 import numpy as np
 
@@ -107,13 +109,15 @@ class TrackedObjectsRepository:
         for tracked_object in self._tracked_objects:
             tracked_object.predict()
 
-    def control_boxes(self) -> None:
+    def control_boxes(self, info) -> None:
 
         for tracked_object in self._tracked_objects:
             if tracked_object.id not in self._collected_lifelines_id:
                 if tracked_object.tracker_point not in self._info.update_area:
-                    self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
+                    self.lifelines.append(tracked_object.history)
                     self._collected_lifelines_id.append(tracked_object.id)
+                else:
+                    tracked_object.update_history()
 
             if tracked_object.tracker_point not in self._info.corridors_repository or tracked_object.tracker_point not in self._info.update_area:
                 self._tracked_objects.remove(tracked_object)
@@ -129,25 +133,26 @@ class TrackedObjectsRepository:
 
 class TrackedObject:
 
-    @staticmethod
-    def draw_lifelines(image, lifelines=None, color=params.COLOR_RED, thickness=1) -> np.ndarray:
-        if lifelines is not None:
-            for line in lifelines:
-
-                mask = np.zeros_like(image)
-
-                p1, p2 = line
-
-                try:
-                    l = Line(p1, p2)
-                    l.draw(mask, color, thickness)
-                    image = cv2.add(image, mask)
-                except SamePointError:
-                    continue
-                except NotOnLineError:
-                    raise
-
-        return image
+    # @staticmethod
+    # def draw_lifelines(image, info, lifelines=None, color=params.COLOR_RED, thickness=1) -> np.ndarray:
+    #     if lifelines is not None:
+    #         for line in lifelines:
+    #
+    #             mask = np.zeros_like(image)
+    #
+    #             p1 = line[0]
+    #             p2 = info.vp1.point
+    #
+    #             try:
+    #                 l = Line(p1, p2)
+    #                 l.draw(mask, color, thickness)
+    #                 image = cv2.add(image, mask)
+    #             except SamePointError:
+    #                 continue
+    #             except NotOnLineError:
+    #                 raise
+    #
+    #     return image
 
     @staticmethod
     def lifeline_convex_hull(info, lifelines=None) -> np.ndarray:
@@ -179,12 +184,16 @@ class TrackedObject:
 
         for lifeline in lifelines:
             line_to_vp = Line(lifeline[0], vp1.point)
-            lifeline_line = Line(lifeline[0], lifeline[1])
+
+            try:
+                lifeline_line = Line(lifeline[0], lifeline[-1])
+            except SamePointError:
+                continue
 
             if 30 < lifeline_line.angle(line_to_vp) < 150:
                 continue
 
-            elif lifeline[0][1] < lifeline[1][1]:
+            elif lifeline[0][1] < lifeline[-1][1]:
                 continue
 
             else:
@@ -192,21 +201,21 @@ class TrackedObject:
 
         return filtered
 
-    @staticmethod
-    def draw(image, boxes, lifelines=None) -> np.ndarray:
-
-        for box in boxes:
-            anchors, area_of_interest, car_info = box
-
-            top_left, bot_right, center_point = anchors
-
-            cv2.circle(image, center_point, area_of_interest, params.COLOR_BLUE, BOX_THICKNESS)
-            cv2.putText(image, car_info, top_left, 1, 1, params.COLOR_WHITE, 2)
-
-        if lifelines is not None:
-            return TrackedObject.draw_lifelines(image, lifelines)
-        else:
-            return image
+    # @staticmethod
+    # def draw(image, boxes, lifelines=None) -> np.ndarray:
+    #
+    #     for box in boxes:
+    #         anchors, area_of_interest, car_info = box
+    #
+    #         top_left, bot_right, center_point = anchors
+    #
+    #         cv2.circle(image, center_point, area_of_interest, params.COLOR_BLUE, BOX_THICKNESS)
+    #         cv2.putText(image, car_info, top_left, 1, 1, params.COLOR_WHITE, 2)
+    #
+    #     if lifelines is not None:
+    #         return TrackedObject.draw_lifelines(image, lifelines)
+    #     else:
+    #         return image
 
     def __init__(self, coordinates, size, confident_score, info, object_id):
 
@@ -238,7 +247,7 @@ class TrackedObject:
             [np.float32(0)],  # dy
         ])
 
-        self._history = [self.center]
+        self._history = [self.center.tuple()]
 
     @property
     def flow(self):
@@ -246,7 +255,7 @@ class TrackedObject:
 
     @property
     def history(self):
-        return self._start_coordinates
+        return self._history
 
     @property
     def tracker_point(self):
@@ -307,6 +316,10 @@ class TrackedObject:
     @property
     def radius(self):
         return int(np.sqrt(self.size.width * self.size.width + self.size.height * self.size.height) / 2)
+
+    def update_history(self):
+        if np.abs(self.center.y - self._history[-1][1]) > 20:
+            self._history.append(self.center.tuple())
 
     def overlap(self, overlapping_object):
 

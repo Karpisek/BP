@@ -1,8 +1,8 @@
 from bbox.coordinates import Coordinates
 from bbox.tracked_object import TrackedObject
-from pc_lines.line import Line, SamePointError
+from pc_lines.line import Line, SamePointError, ransac
 from pc_lines.pc_line import PcLines
-from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
+from pc_lines.vanishing_point import VanishingPoint
 from pipeline import ThreadedPipeBlock
 
 import cv2
@@ -22,7 +22,6 @@ class Calibrator(ThreadedPipeBlock):
         super().__init__(info=info, pipe_id=params.CALIBRATOR_ID, output=output)
 
         self._pc_lines = PcLines(info.width)
-
         self._detected_lines = []
 
     def _mode_changed(self, new_mode):
@@ -43,18 +42,17 @@ class Calibrator(ThreadedPipeBlock):
             elif len(self._info.vanishing_points) < 2:
                 self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
 
-            # elif len(self._info.vanishing_points) < 3:
-            #     self.calculate_third_vp()
-
             elif len(TrackedObject.filter_lifelines(lifelines, self._info.vp1)) > params.CORRIDORS_MINIMUM_LIFELINES:
                 self.find_corridors(lifelines)
 
     def detect_first_vp(self, lifelines):
         if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
 
-            for lifeline in lifelines:
-                old_position, new_position = lifeline
-                self._pc_lines.add_to_pc_space(tuple(old_position), tuple(new_position))
+            for history in lifelines:
+                line, value = ransac(history, history, 1)
+
+                if line is not None and value > 5:
+                    self._pc_lines.add_to_pc_space(line=line)
 
             new_vanishing_point = self._pc_lines.find_most_lines_cross()
             self._info.vanishing_points.append(VanishingPoint(point=new_vanishing_point))
@@ -65,7 +63,6 @@ class Calibrator(ThreadedPipeBlock):
             return
 
         selected_areas = cv2.bitwise_and(new_frame, cv2.cvtColor(boxes_mask, cv2.COLOR_GRAY2RGB))
-        # blured = cv2.blur(selected_areas, (3, 3))
         blured = cv2.GaussianBlur(selected_areas, (7, 7), 0)
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
@@ -133,12 +130,25 @@ class Calibrator(ThreadedPipeBlock):
 
     def find_corridors(self, lifelines):
         filtered_lifelines = TrackedObject.filter_lifelines(lifelines, self._info.vp1)
-
         mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
-        mask = TrackedObject.draw_lifelines(image=mask,
-                                            lifelines=filtered_lifelines,
-                                            color=params.COLOR_LIFELINE,
-                                            thickness=100)
+
+        for history in filtered_lifelines:
+            line, value = ransac(history, history, 1)
+
+            if line is not None and value > 5:
+                bottom_point = Coordinates(*line.find_coordinate(y=self._info.height)).tuple()
+
+                cv2.line(img=mask,
+                         pt1=bottom_point,
+                         pt2=self._info.vp1.point,
+                         color=params.COLOR_LIFELINE,
+                         thickness=100)
+
+        # mask = TrackedObject.draw_lifelines(image=mask,
+        #                                     info=self._info,
+        #                                     lifelines=super_filtered_lifelines,
+        #                                     color=params.COLOR_LIFELINE,
+        #                                     thickness=100)
 
         self._info.corridors_repository.find_corridors(lifelines_mask=mask,
                                                        vp1=self._info.vanishing_points[0])
