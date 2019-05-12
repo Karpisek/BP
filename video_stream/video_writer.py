@@ -1,11 +1,7 @@
 import json
 import shutil
-
 import cv2
 import os
-
-import numpy as np
-
 import params
 
 from collections import deque
@@ -17,11 +13,27 @@ from repositories.traffic_light_repository import Color
 
 
 class ViolationWriter(ThreadedPipeBlock):
+    """
+    Writes detected violations to separate file. Each violation is saved in short video and corresponding
+    annotation file containing annotation of car for every frame.
+
+    Each violation car is assignet to instance of VideoWriter.
+
+    After computation is done, statistics about examined scene are saved as well. New folder is generated for all
+    files about examined video. Containing video files, annotation files and statistic file.
+
+    Holds history of frames for new VideoWrite to start on.
+    """
 
     def _mode_changed(self, new_mode):
         super()._mode_changed(new_mode)
 
     def __init__(self, info, program_arguments):
+        """
+        :param info: instance of InputInfo containing all information of examined video
+        :param program_arguments: instance of Parser used for setting root directory of output directory
+        """
+
         super().__init__(info=info, pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
         self._video_writers = {}
         self._captured_ids = []
@@ -37,12 +49,27 @@ class ViolationWriter(ThreadedPipeBlock):
         self._history = deque(maxlen=params.VIOLATION_WRITER_SEQUENCE_LENGTH)
 
     def _before(self):
+        """
+        Cleans output directory with no warning, if no such directory is being found it creates new one.
+        """
+
         if os.path.exists(self._path):
             shutil.rmtree(self._path)
 
         os.makedirs(self._path)
 
     def _step(self, seq):
+        """
+        Receives new message from video player - just for check there is no user interaction closing the program.
+        Gets new frame from FrameLoader and all information about objects in scene from Observer
+
+        Delegates information about violations to VideoWriter instances for each of violation car.
+        When new car makes violation, new instance of VideoWriter is generated.
+        If lifetime of any VideoWriter is over specified threshold - it is being closed
+
+        :param seq: current sequence number
+        """
+
         self.receive(pipe_id=params.VIDEO_PLAYER_ID)
 
         loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
@@ -55,7 +82,7 @@ class ViolationWriter(ThreadedPipeBlock):
             if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
-                                                          image_history=deepcopy(self._history),
+                                                          history=deepcopy(self._history),
                                                           path=self._path)
                 self._captured_ids.append(car_id)
 
@@ -63,7 +90,7 @@ class ViolationWriter(ThreadedPipeBlock):
             if car_id not in self._captured_ids:
                 self._video_writers[car_id] = VideoWriter(info=self._info,
                                                           car_id=car_id,
-                                                          image_history=deepcopy(self._history),
+                                                          history=deepcopy(self._history),
                                                           path=self._path)
                 self._captured_ids.append(car_id)
 
@@ -78,6 +105,11 @@ class ViolationWriter(ThreadedPipeBlock):
         self._last_boxes_repository = boxes_repository
 
     def _after(self):
+        """
+        Writes statistics and calibration information in selected file.
+        Closes VideoWriter instances for violations.
+        """
+
         self._write_statistics()
         self._write_calibration()
 
@@ -86,12 +118,21 @@ class ViolationWriter(ThreadedPipeBlock):
             del self._video_writers[writer.car_id]
 
     def _append_to_history(self, package):
-        if len(self._history) == 20:
+        """
+        Appends new package to history. Only last x frames are saved
+        :param package: package which should be added to history
+        """
+
+        if len(self._history) == params.VIDEO_WRITER_HISTORY:
             self._history.popleft()
 
         self._history.append(package)
 
     def _write_statistics(self):
+        """
+        Writes statistics to selected file
+        """
+
         if self._last_boxes_repository is not None:
             path = f"{self._path}/{str(self._info.calibration_mode)}_{params.STATISTICS_LOG_FILENAME}"
 
@@ -102,6 +143,10 @@ class ViolationWriter(ThreadedPipeBlock):
                 json.dump(data, file)
 
     def _write_calibration(self):
+        """
+        Write calibration information to selected file
+        """
+
         path = f"{self._path}/{str(self._info.calibration_mode)}_{params.CALIBRATION_FILENAME}"
 
         with open(path, "w") as file:
@@ -111,6 +156,13 @@ class ViolationWriter(ThreadedPipeBlock):
             json.dump(data, file)
 
     def _save_light_state(self, lights_state, seq):
+        """
+        Saves current light state to history
+
+        :param lights_state: current light state
+        :param seq: current sequence number
+        """
+
         if lights_state != self._current_light_state:
             if lights_state == Color.GREEN:
                 self._light_states["green"].append(seq)
@@ -131,29 +183,55 @@ class ViolationWriter(ThreadedPipeBlock):
 
 
 class VideoWriter:
-    def __init__(self, info, car_id, image_history, path):
+    """
+    Writes frames and annotations for one certain Violation.
+    Each VideoWriter is being identified by ID of examined car
+    """
+
+    def __init__(self, info, car_id, history, path):
+        """
+        :param info: instance of InputInfo containing all information about examined scene.
+        :param car_id: id of current car for searching in history
+        :param history: history of frames and another saved information
+        :param path: path of directory where should output be put
+        """
+
         self._path = f"{path}/{car_id}"
         self._car_id = car_id
         self._info = info
         self._output = cv2.VideoWriter(self._path + ".avi", cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), self._info.fps,
                                        (self._info.width, self._info.height))
-        self._lifetime = 2 * len(image_history)
+        self._lifetime = 2 * len(history)
         self._annotation_output = {"top_left": [],
                                    "bottom_right": [],
                                    "behaviour": []}
 
-        for package in image_history:
+        for package in history:
             self.add_package(package)
 
     @property
     def car_id(self):
+        """
+        :return: ID of examined car
+        """
+
         return self._car_id
 
     @property
     def lifetime(self):
+        """
+        :return: lifetime of this VideoWriter
+        """
+
         return self._lifetime
 
     def add_package(self, package):
+        """
+        Writes new information to files from given package
+
+        :param package: package with mew frame and information about object on it.
+        """
+
         image, boxes_repository, lights_state = package
 
         try:
@@ -171,6 +249,10 @@ class VideoWriter:
         self._lifetime -= 1
 
     def close(self):
+        """
+        Releases video output file and writes annotation to .json file
+        """
+
         self._output.release()
         with open(self._path + ".json", "w") as file:
             json.dump(self._annotation_output, file)

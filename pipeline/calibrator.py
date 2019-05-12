@@ -1,13 +1,13 @@
+import cv2
+import numpy as np
+import params
+
 from bbox.coordinates import Coordinates
 from bbox.tracked_object import TrackedObject
 from pc_lines.line import Line, SamePointError, ransac
 from pc_lines.pc_line import PcLines
-from pc_lines.vanishing_point import VanishingPoint
+from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
 from pipeline import ThreadedPipeBlock
-
-import cv2
-import numpy as np
-import params
 from pipeline.base.pipeline import Mode
 from repositories.traffic_light_repository import Color
 
@@ -17,35 +17,69 @@ class SyncError(Exception):
 
 
 class Calibrator(ThreadedPipeBlock):
+    """
+    Makes calibration of current scene - searches for dominant Vanishing points. Third one is being computed from the
+    previous ones. Works only in calibration work mode, after then is this Block closed
+    """
 
     def __init__(self, output=None, info=None):
+        """
+        :param output: output PipeBlocks
+        :param info: instance of InputInfo containing all information about examined video. Holds information
+        about founded vanishing point.
+        """
         super().__init__(info=info, pipe_id=params.CALIBRATOR_ID, output=output)
 
         self._pc_lines = PcLines(info.width)
         self._detected_lines = []
 
     def _mode_changed(self, new_mode):
+        """
+        If new mode is detection this thread is closed
+
+        :raise EOFError to stop computing
+        :param new_mode: new mode
+        """
         super()._mode_changed(new_mode)
 
         if new_mode == Mode.DETECTION:
             raise EOFError
 
     def _step(self, seq):
+        """
+        On each step it tries to compute new vanishing point if it has enough information to do so.
+        Detects first two dominant vanishing points in scene. Third is not beeing used in this project but can be
+        easily implemented.
+
+        :param seq: current sequnce number
+        """
+
         seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
         seq_lights, light_status = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
         seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
 
         if not self._info.corridors_repository.corridors_found:
             if len(self._info.vanishing_points) < 1:
-                self.detect_first_vp(lifelines)
+                self._detect_first_vp(lifelines)
 
             elif len(self._info.vanishing_points) < 2:
-                self.detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
+                self._detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
 
             elif len(TrackedObject.filter_lifelines(lifelines, self._info.vp1)) > params.CORRIDORS_MINIMUM_LIFELINES:
-                self.find_corridors(lifelines)
+                self._find_corridors(lifelines)
 
-    def detect_first_vp(self, lifelines):
+    def _detect_first_vp(self, lifelines):
+        """
+        Detects first vanishing point using tracked movement of cars.
+        Tracked movement lines are accumulated into parallel coordinate space where RANSAC algorithm is used for
+        intersection detection - Vanishing Point.
+
+        After vanishing point is being found it propagates this information to InputInfo where it adds VanishingPoint
+        to corresponding list.
+
+        :param lifelines: movement of cars
+        """
+
         if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
 
             for history in lifelines:
@@ -54,11 +88,35 @@ class Calibrator(ThreadedPipeBlock):
                 if line is not None and value > 5:
                     self._pc_lines.add_to_pc_space(line=line)
 
-            new_vanishing_point = self._pc_lines.find_most_lines_cross()
-            self._info.vanishing_points.append(VanishingPoint(point=new_vanishing_point))
+            # for history in lifelines:
+            #     try:
+            #         self._pc_lines.add_to_pc_space(point1=history[0], point2=history[-1])
+            #     except IndexError:
+            #         pass
+
+            if self._pc_lines.count > params.CALIBRATOR_VP1_TRACK_MINIMUM:
+                new_vanishing_point = self._pc_lines.find_most_lines_cross(write=True)
+                self._info.vanishing_points.append(VanishingPoint(point=new_vanishing_point))
+
             self._pc_lines.clear()
 
-    def detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border, light_status) -> None:
+    def _detect_second_vanishing_point(self, new_frame, boxes_mask, boxes_mask_no_border, light_status) -> None:
+        """
+        Calculates second vanishing point using information about car positions and detection of edges supporting
+        second vanishing point. It is being detected only if green light status is present on current frame.
+        Detected lines from edges are accumulated into parallel coordinate space - RANSAC algorithm is used
+        for intersection detection - Vanishing Point.
+
+
+        After vanishing point is being found it propagates this information to InputInfo where it adds VanishingPoint
+        to corresponding list
+
+        :param new_frame: examined frame
+        :param boxes_mask: mask used for selecting parts of image where cars exists
+        :param boxes_mask_no_border: mask used for selecting parts of image where cars exists
+        :param light_status: current light status
+        """
+
         if light_status in [Color.RED, Color.RED_ORANGE]:
             return
 
@@ -67,6 +125,8 @@ class Calibrator(ThreadedPipeBlock):
 
         canny = cv2.Canny(blured, 50, 150, apertureSize=3)
         no_border_canny = cv2.bitwise_and(canny, boxes_mask_no_border)
+
+        no_border_canny = cv2.bitwise_and(no_border_canny, no_border_canny, mask=self._info.update_area.mask())
         lines = cv2.HoughLinesP(image=no_border_canny,
                                 rho=1,
                                 theta=np.pi / 350,
@@ -76,7 +136,7 @@ class Calibrator(ThreadedPipeBlock):
 
         vp1 = self._info.vanishing_points[0]
 
-        canny = cv2.cvtColor(canny, cv2.COLOR_GRAY2RGB)
+        canny = cv2.cvtColor(no_border_canny, cv2.COLOR_GRAY2RGB)
 
         if lines is not None:
             for (x1, y1, x2, y2), in lines:
@@ -98,7 +158,7 @@ class Calibrator(ThreadedPipeBlock):
                 except SamePointError:
                     continue
 
-            cv2.imwrite("test.jpg", canny)
+            cv2.imwrite("test.jpg", no_border_canny)
 
         if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_lines_cross()
@@ -114,41 +174,63 @@ class Calibrator(ThreadedPipeBlock):
 
             self._pc_lines.clear()
 
-    # def calculate_third_vp(self):
-    #     vp1 = self._info.vanishing_points[0].point
-    #
-    #     try:
-    #         vp2 = self._info.vanishing_points[1].point
-    #         vp1_to_vp2 = Line(point1=vp1,
-    #                           point2=vp2)
-    #
-    #     except VanishingPointError:
-    #         vp1_to_vp2 = Line(point1=vp1,
-    #                           direction=self._info.vanishing_points[1].direction)
-    #
-    #     self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
+    def _calculate_third_vp(self):
+        """
+        Because principal point is said to be in midle, the third vanishing point can be obtained by simple
+        mathematics.
 
-    def find_corridors(self, lifelines):
+        After vanishing point is being found it propagates this information to InputInfo where it adds VanishingPoint
+        to corresponding list
+        """
+
+        vp1 = self._info.vanishing_points[0].point
+
+        try:
+            vp2 = self._info.vanishing_points[1].point
+            vp1_to_vp2 = Line(point1=vp1,
+                              point2=vp2)
+
+        except VanishingPointError:
+            vp1_to_vp2 = Line(point1=vp1,
+                              direction=self._info.vanishing_points[1].direction)
+
+        self._info.vanishing_points.append(VanishingPoint(direction=vp1_to_vp2.normal_direction()))
+
+    def _find_corridors(self, lifelines):
+        """
+        After both vanishing points are found corridors can be constructed with the information of car trajectories.
+
+        :param lifelines: trajectories of cars
+        """
+
         filtered_lifelines = TrackedObject.filter_lifelines(lifelines, self._info.vp1)
         mask = np.zeros(shape=(self._info.height, self._info.width, 3), dtype=np.uint8)
 
+        # for history in filtered_lifelines:
+        #     line, value = ransac(history, history, 1)
+        #
+        #     if line is not None and value > 5:
+        #         bottom_point = Coordinates(*line.find_coordinate(y=self._info.height)).tuple()
+        #
+        #         cv2.line(img=mask,
+        #                  pt1=bottom_point,
+        #                  pt2=self._info.vp1.point,
+        #                  color=params.COLOR_LIFELINE,
+        #                  thickness=100)
+
         for history in filtered_lifelines:
-            line, value = ransac(history, history, 1)
+            helper_mask = np.zeros_like(mask)
 
-            if line is not None and value > 5:
-                bottom_point = Coordinates(*line.find_coordinate(y=self._info.height)).tuple()
+            first_point = history[0]
 
-                cv2.line(img=mask,
-                         pt1=bottom_point,
-                         pt2=self._info.vp1.point,
-                         color=params.COLOR_LIFELINE,
-                         thickness=100)
+            line = Line(first_point, self._info.vp1.point)
+            line.draw(image=helper_mask,
+                      color=params.COLOR_LIFELINE,
+                      thickness=100)
 
-        # mask = TrackedObject.draw_lifelines(image=mask,
-        #                                     info=self._info,
-        #                                     lifelines=super_filtered_lifelines,
-        #                                     color=params.COLOR_LIFELINE,
-        #                                     thickness=100)
+            mask = cv2.add(mask, helper_mask)
+
+        cv2.imwrite("lifeline.jpg", mask)
 
         self._info.corridors_repository.find_corridors(lifelines_mask=mask,
                                                        vp1=self._info.vanishing_points[0])

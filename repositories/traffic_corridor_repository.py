@@ -1,12 +1,18 @@
 import cv2
 import numpy as np
-
 import params
+
 from pc_lines.line import Line, SamePointError
 from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
 
 
 def _mouse_callback(event, x, y, _, param):
+    """
+    Responses on mouse callback
+
+    :param param: Instance of object where click or move should be delegated
+    """
+
     corridor_maker = param
 
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -16,7 +22,14 @@ def _mouse_callback(event, x, y, _, param):
 
 
 class TrafficCorridorRepository:
+    """
+    Repository used for creating and storing traffic corridors. Holds information of stop line as well
+    """
+
     def __init__(self, info):
+        """
+        :param info: instance of InputInfo
+        """
         self._corridors_found = False
         self._stopline_found = False
 
@@ -30,32 +43,86 @@ class TrafficCorridorRepository:
 
     @property
     def count(self):
+        """
+        :return: number of detected corridors
+        """
+
         return self._corridors_count
 
     @property
     def corridors_found(self):
+        """
+        :return: if corridors were found
+        """
+
         return self._corridors_found
 
     @property
     def corridor_ids(self):
+        """
+        :return: IDs of corridors
+        """
+
         return self._corridors.keys()
 
     @property
     def stopline_found(self):
+        """
+        :return: If stopline was found
+        """
+
         return self._stopline_found
 
     @property
+    def stopline(self):
+        """
+        :return: detected stop line
+        """
+
+        return self._stop_line
+
+    @stopline.setter
+    def stopline(self, value):
+        """
+        Sets the stopline with specified offset, assuming that first vanishing point is in the top part of frame
+        """
+
+        self._stop_line = value
+
+        left_edge_point = self.stopline.edge_points(info=self._info)[0]
+        right_edge_point = self.stopline.edge_points(info=self._info)[1]
+
+        self._stop_line = Line(point1=(left_edge_point[0], left_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET),
+                               point2=(right_edge_point[0], right_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET))
+
+        top_line = Line(point1=(left_edge_point[0], 2 * left_edge_point[1] / 3),
+                        point2=(right_edge_point[0], 2 * right_edge_point[1] / 3))
+
+        self._info.update_area.change_area(top_line=top_line)
+
+    @property
     def ready(self):
+        """
+        :return: if both corridors and stop line is found
+        """
+
         return self.corridors_found and self._stopline_found
 
     @property
     def corridor_mask(self):
+        """
+        :return: mask of corridors
+        """
+
         return self._corridor_mask
 
-    def load_serialized(self, serialized_corridors):
-        raise NotImplementedError
-
     def select_manually(self, image):
+        """
+        Allows user to select corridors and stop line manually
+
+        :param image: image to select on
+        """
+
         corridor_maker = CorridorMaker(image)
         stop_line_maker = StopLineMaker(image)
 
@@ -79,29 +146,45 @@ class TrafficCorridorRepository:
 
         self._info.vanishing_points.append(VanishingPoint(point=most_left_selection.intersection(most_right_selection)))
 
-        self._stop_line = stop_line_maker.run(info=self._info)
+        self.stopline = stop_line_maker.run(info=self._info)
 
         self._stopline_found = True
         self._corridors_found = True
 
     def line_crossed(self, previous_coordinates, coordinates):
+        """
+        :param previous_coordinates: previous coordinates of object
+        :param coordinates: new coordinates of object
+        :return: if line is between these two specified positions (while object is moving the right direction)
+        """
+
         if not self.ready:
             return False
 
-        red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
+        red_line_point = self.stopline.find_coordinate(x=coordinates.x)
         return previous_coordinates.y > red_line_point[1] > coordinates.y
 
     def behind_line(self, coordinates):
+        """
+        :param coordinates: coordinates
+        :return: if coordinates are behind stop line (closer to vanishing point)
+        """
+
         if not self.ready:
             return False
 
-        red_line_point = self._stop_line.find_coordinate(x=coordinates.x)
+        red_line_point = self.stopline.find_coordinate(x=coordinates.x)
         return red_line_point[1] > coordinates.y
 
     def __contains__(self, coordinates):
         return self.get_corridor(coordinates) > 0 or not self._corridors_found
 
     def get_corridor(self, coordinates) -> int:
+        """
+        :param coordinates: object coordinates
+        :return: corridor ID where these coordinates belong to. -1 if no corridors were found, 0 when outside corridors
+        """
+
         if not self._corridors_found:
             return -1
 
@@ -111,6 +194,10 @@ class TrafficCorridorRepository:
             return -1
 
     def get_mask(self, fill) -> np.ndarray:
+        """
+        :param fill: if mask should be filled
+        :return: mask of corridors
+        """
 
         image = np.zeros(shape=(self._info.height, self._info.width, 3),
                          dtype=np.uint8)
@@ -125,13 +212,17 @@ class TrafficCorridorRepository:
         image = cv2.bitwise_and(image, image, mask=self._corridor_mask)
 
         if self._stopline_found:
-            self._stop_line.draw(image=image,
-                                 color=params.COLOR_RED,
-                                 thickness=5)
+            self.stopline.draw(image=image,
+                               color=params.COLOR_RED,
+                               thickness=5)
 
         return image
 
     def create_new_corridor(self, left_line, right_line):
+        """
+        Creates new corridor from two specified lines
+        """
+
         self._corridors_count += 1
 
         left_edge_points = left_line.edge_points(self._info)
@@ -170,6 +261,15 @@ class TrafficCorridorRepository:
                                    color=self._corridors_count)
 
     def find_corridors(self, lifelines_mask, vp1):
+        """
+        Finds corridors on frame using first positions of cars and detected first vanishing point to construct
+        mask on which thresholding is used to detect separate corridors.
+        By computation is used only 1px wide age around left, bottom and right edge of frame.
+
+        :param lifelines_mask: mask of lifelines
+        :param vp1: detected first vanishing point
+        """
+
         # extract left-bot-right 1px border around lifeline image and make "1D array"
         left_edge = lifelines_mask[:, :1]
         bottom_edge = lifelines_mask[-1:, :].transpose(1, 0, 2)
@@ -180,16 +280,11 @@ class TrafficCorridorRepository:
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
         edge_grey_blured = cv2.medianBlur(edge_grey, 11)
-        _, threshold = cv2.threshold(edge_grey_blured, 100, 255, cv2.THRESH_BINARY)
+        _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
         threshold = cv2.dilate(threshold, (5, 5), iterations=5)
 
-        # edge_grey_blured = cv2.medianBlur(threshold, 21)
-        # _, threshold = cv2.threshold(edge_grey_blured, 10, 255, cv2.THRESH_BINARY)
-
         height, width = edge_grey_blured.shape
-
         edge_grey_canny = cv2.Canny(threshold, 50, 150)
-
         coordinates = []
 
         # border image with 0
@@ -232,19 +327,30 @@ class TrafficCorridorRepository:
                                      right_line=Line(right_bottom, right_top))
 
         # cv2.imwrite("mask.jpg", self.get_mask())
-        cv2.imwrite("lifeline.jpg", lifelines_mask)
 
         self._corridor_mask = cv2.bitwise_and(self._corridor_mask, self._corridor_mask,
                                               mask=self._info.update_area.mask())
         self._corridors_found = True
 
     def add_stop_point(self, coordinates):
+        """
+        Adds selected stop point to accumulation of stop points. If enough poits are accumulated
+        stop line computation is done.
+
+        :param coordinates: coordinates to add
+        """
+
         self._stop_places.append(coordinates)
 
         if len(self._stop_places) >= params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
             self.find_stop_line()
 
     def find_stop_line(self):
+        """
+        Finds stop line from stored stop-points.
+        For stop line is used second vanishing point which is used as anchor for all detected stop line points.
+        Stop line is detected using RANSAC algorithm.
+        """
 
         best_line_ratio = 0
         best_line = None
@@ -278,15 +384,32 @@ class TrafficCorridorRepository:
                 best_line_ratio = num
                 best_line = line
 
-        self._stop_line = best_line
+        self.stopline = best_line
         self._stopline_found = True
 
     def serialize(self):
+        """
+        Serialize corridors repository in form of dictionary.
+
+        :return: dictionary of serialized corridors
+        """
+
         return {"corridors": [corridor.serialize() for _, corridor in self._corridors.items()]}
 
 
 class TrafficCorridor:
+    """
+    Representation of single traffic corridor.
+    """
+
     def __init__(self, index, left_line, right_line, middle_point):
+        """
+        :param index: corridor id
+        :param left_line: left line of corridor
+        :param right_line: right line of corridor
+        :param middle_point: middle point to use flood fill
+        """
+
         self._id = index
 
         self.left_line = left_line
@@ -295,9 +418,23 @@ class TrafficCorridor:
 
     @property
     def id(self):
+        """
+        :return: corridor id
+        """
+
         return self._id
 
     def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
+        """
+        Helper function for drawing corridor
+
+        :param image: image to draw on
+        :param info: instance of InputInfo
+        :param color: selected color
+        :param fill: if flood fill should be used
+        :param thickness: thickness of line defining corridors
+        """
+
         if color is None:
             color = self.id
 
@@ -327,6 +464,10 @@ class TrafficCorridor:
                                  thickness=5)
 
     def serialize(self):
+        """
+        :return: serialized Traffic corridor in form of dictionary
+        """
+
         return {"left_line": self.left_line.serialize(),
                 "right_line": self.right_line.serialize()}
 
@@ -335,7 +476,15 @@ class TrafficCorridor:
 
 
 class LineDrag:
+    """
+    Used for user interaction (dragging line)
+    """
+
     def __init__(self, image):
+        """
+        :param image: selected image to draw on
+        """
+
         self.selected = []
         self.base_image = image
 
@@ -343,6 +492,12 @@ class LineDrag:
         self.point2 = None
 
     def click(self, point):
+        """
+        click response on user click
+
+        :param point: coordinates where was clicked
+        """
+
         if self.point1 is None:
             self.point1 = point
 
@@ -350,6 +505,12 @@ class LineDrag:
             self.__add_line()
 
     def move(self, point):
+        """
+        response for mouse move
+
+        :param point: current coordinates of mouse
+        """
+
         self.point2 = point
 
     def __add_line(self):
@@ -359,6 +520,12 @@ class LineDrag:
         self.point2 = None
 
     def draw(self, image):
+        """
+        Helper function to draw selected line on selected image.
+
+        :param image: selected image.
+        """
+
         if self.point1 is not None:
             cv2.line(img=image,
                      pt1=self.point1,
@@ -367,6 +534,10 @@ class LineDrag:
                      thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def clear(self):
+        """
+        clears selected points
+        """
+
         self.point1 = None
         self.point2 = None
 
@@ -381,24 +552,44 @@ class LineDrag:
 
 
 class StopLineMaker(LineDrag):
+    """
+    Used for stop line creation
+    """
+
     def __init__(self, image):
         super().__init__(image)
 
         self.line = None
 
     def add_line(self):
+        """
+        Adds stop line
+        """
+
         try:
             self.line = Line(self.point1, self.point2)
         except SamePointError:
             pass
 
     def draw(self, image):
+        """
+        Helper function to draw stop line
+
+        :param image: selected image
+        """
+
         super().draw(image)
 
         if self.line is not None:
             self.line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def run(self, info) -> []:
+        """
+        Infinite loop until user selects stop line
+
+        :param info: instance of InputInfo
+        """
+
         cv2.namedWindow("select_stop_line")
         cv2.setMouseCallback("select_stop_line", _mouse_callback, self)
 
@@ -426,16 +617,28 @@ class StopLineMaker(LineDrag):
                 self.erase_last()
 
     def erase_last(self):
+        """
+        Deletes last selected stopline
+        """
+
         self.line = None
 
 
 class CorridorMaker(LineDrag):
+    """
+    Used for corridor marking by user
+    """
+
     def __init__(self, image):
         super().__init__(image)
         self.selected = []
         self.base_image = image
 
     def add_line(self):
+        """
+        Adds new line to storage
+        """
+
         try:
             new_line = Line(self.point1, self.point2)
 
@@ -446,6 +649,12 @@ class CorridorMaker(LineDrag):
             pass
 
     def draw(self, image):
+        """
+        Helper method for drawing selected corridor lines
+
+        :param image: selected image
+        """
+
         super().draw(image)
 
         for line in self.selected:
@@ -455,16 +664,30 @@ class CorridorMaker(LineDrag):
         return iter(self.selected)
 
     def clear(self):
+        """
+        Clears all selected corridor lines
+        """
+
         self.selected = []
         super().clear()
 
     def erase_last(self):
+        """
+        Erases last selected corridor line
+        """
+
         try:
             self.selected.pop()
         except IndexError:
             pass
 
     def run(self, info) -> []:
+        """
+        Runs infinite loop until user commits selected corridor lines.
+
+        :param info: instance of InputInfo
+        """
+
         cv2.namedWindow("select_corridors")
         cv2.setMouseCallback("select_corridors", _mouse_callback, self)
 

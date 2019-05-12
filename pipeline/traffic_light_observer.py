@@ -7,10 +7,20 @@ from repositories.traffic_light_repository import Color
 
 
 class TrafficLightsObserver(ThreadedPipeBlock):
+    """
+    Observes detected light and decides what state is on them.
+    Delegates this message to output PipeBlocks.
+    For light state classification uses color spectre filtering.
+    """
 
     colors = [Color.RED_ORANGE, Color.RED, Color.ORANGE, Color.GREEN]
 
     def __init__(self, info, output):
+        """
+        :param info: InputInfo instance for getting traffic light localization in scene
+        :param output: list of PipeBlock output instances
+        """
+
         super().__init__(info=info, output=output, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
 
         self._state = None
@@ -21,6 +31,12 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         self._state_candidate_count = 0
 
     def _mode_changed(self, new_mode):
+        """
+        if mode changed to detection current state is forgotten
+
+        :param new_mode: new mode
+        """
+
         super()._mode_changed(new_mode)
 
         if new_mode == Mode.DETECTION:
@@ -31,6 +47,12 @@ class TrafficLightsObserver(ThreadedPipeBlock):
             self._state_candidate_count = 0
 
     def _step(self, seq):
+        """
+        On each step current traffic light status is computed, then the result is send to ouputs.
+
+        :param seq: current sequnece number
+        """
+
         loader_seq, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
 
         new_status = self.status(current_frame=new_frame, previous_frame=self._previous_frame)
@@ -45,6 +67,15 @@ class TrafficLightsObserver(ThreadedPipeBlock):
             self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
 
     def status(self, current_frame, previous_frame):
+        """
+        Calculates current light status, using color analyses and knowing behaviour of traffic light.
+        Change is detected only, if condition is satisfied for more then one defined number of frames in a row
+
+        :param current_frame: current frame
+        :param previous_frame: previous frame
+        :return: current light state
+        """
+
         if self._info.traffic_lights_repository.size == 0:
             return None
 

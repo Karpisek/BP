@@ -1,20 +1,34 @@
-from copy import deepcopy
-
 import params
 
+from copy import deepcopy
 from bbox import TrackedObjectsRepository
 from bbox.optical_flow import OpticalFlow
 from pipeline import ThreadedPipeBlock
 from munkres import Munkres
-from pipeline.base.pipeline import is_frequency, Mode
+from pipeline.base.pipeline import is_frequency
 
 
 def transpose_matrix(matrix):
+    """
+    :param matrix: matrix to transpose
+    :return: transposed matrix
+    """
+
     return list(map(list, zip(*matrix)))
 
 
 class Tracker(ThreadedPipeBlock):
+    """
+    Tracks detected object thru the scene. Uses Kalman filter and hungarian algorithm for predicting and
+    assigning tracked objects.
+    """
+
     def __init__(self, info, output=None):
+        """
+        :param info: instance of InputInfo
+        :param output: list of PipeBlock outputs
+        """
+
         super().__init__(info=info, pipe_id=params.TRACKER_ID, output=output)
 
         self.new_positions = []
@@ -28,18 +42,33 @@ class Tracker(ThreadedPipeBlock):
         self._munkres = Munkres()
 
     def _mode_changed(self, new_mode):
+        """
+        On mode changed clears all tracked objects
+
+        :param new_mode: nwe mode
+        """
+
         super()._mode_changed(new_mode)
 
         self._tracked_object_repository.restart()
 
     def _step(self, seq):
+        """
+        On every step new detections are read - if possible. Then predicted position is computed on each tracked
+        object instance using Kalman filter. Optical flow is used as secondary mesurement.
+        Detection are assigned to existing instances of tracked object using hungarian algorithm
+        New detected instances are added to Tracked object repository.
+
+        :param seq: current sequence number
+        """
+
         if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):
             self._update_from_detector(seq)
 
         else:
             self._update_from_predictor(seq)
 
-        self._tracked_object_repository.control_boxes(self._info)
+        self._tracked_object_repository.control_boxes(mode=self._mode)
 
         if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
             self._send_message(target=params.CALIBRATOR_ID,
@@ -51,6 +80,15 @@ class Tracker(ThreadedPipeBlock):
                                sequence_number=seq)
 
     def _send_message(self, target, sequence_number, block=True):
+        """
+        Helper method for sending messages to output PipeBlocks
+        depending on target receiver it generates certain message and sends it using send() method.
+
+        :param target: targeted receiver
+        :param sequence_number: current sequence number
+        :param block: if sending message should wait until receiver could receive
+        """
+
         message = None
 
         if target == params.VIDEO_PLAYER_ID:
@@ -74,6 +112,13 @@ class Tracker(ThreadedPipeBlock):
             self.send(message, pipe_id=target, block=block)
 
     def _update_from_detector(self, sequence_number) -> None:
+        """
+        Updates position of tracked objects by using detected objects.
+        For assigning problem is called hungarian_method(). For unassigned detections are generated new tracked object
+        instances.
+
+        :param sequence_number: current sequnce number
+        """
 
         detected_objects = self.receive(pipe_id=params.DETECTOR_CAR_ID)
 
@@ -90,6 +135,11 @@ class Tracker(ThreadedPipeBlock):
                     self._tracked_object_repository.new_tracked_object(*detected_object)
 
     def _update_from_predictor(self, sequence_number) -> None:
+        """
+        Updates position by using predictor on each instance of tracked object.
+
+        :param sequence_number: current sequence number
+        """
 
         self._tracked_object_repository.predict()
 
@@ -97,7 +147,18 @@ class Tracker(ThreadedPipeBlock):
             _, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
             self._optical_flow.update(new_frame)
 
+            # image = np.copy(new_frame)
+            # cv2.imwrite("optical_flow.png", OpticalFlow.draw(image, self._optical_flow.serialize()))
+
     def _hungarian_method(self, detected_boxes) -> None:
+        """
+        Solves position assigning problem.
+        Modification: doesnt allow to assigne position which are too far away from each other.
+        Assigned positions are updated by new detected.
+        Unassigned are generated if some conditions are met.
+
+        :param detected_boxes: detect boxes by detector
+        """
 
         matrix = []
         for old_object in self._tracked_object_repository.list:

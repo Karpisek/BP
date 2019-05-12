@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 import cv2
 import tensorflow as tf
@@ -6,10 +6,9 @@ import numpy as np
 
 import params
 from bbox import Coordinates
-from repositories.base.repository import Repository
 
 
-class Color(IntEnum): # RED, RED_ORANGE_ ORANDG
+class Color(IntEnum):
     ORANGE = 0
     RED = 1
     RED_ORANGE = 2
@@ -17,9 +16,19 @@ class Color(IntEnum): # RED, RED_ORANGE_ ORANDG
     NONE = 4
 
 
-class TrafficLightsRepository(Repository):
+class TrafficLightsRepository:
+    """
+    Repository for storing detected lights (only one light supported for this moment)
+    Allows creating and storing these lights.
+    Allows detection of traffic light using given model of neural network capable of object detection.
+    """
 
     def __init__(self, model, info):
+        """
+        :param model: path to neural network used for traffic light detection
+        :param info: instance of InputInfo
+        """
+
         self._model = model
         self._info = info
         self._traffic_lights = []
@@ -43,16 +52,39 @@ class TrafficLightsRepository(Repository):
 
     @property
     def ready(self) -> bool:
+        """
+        :return: if any traffic light was found
+        """
+
         return self.size > 0
 
     @property
     def size(self):
+        """
+        :return: number of detected traffic lights
+        """
+
         return len(self._traffic_lights)
 
     def state(self, current_frame, previous_frame):
+        """
+        computes actual state of traffic light (only first detected traffic light is used for this moment).
+        Uses two images to reduce error.
+
+        :param current_frame: current frame
+        :param previous_frame: previous frame
+        :return: detected traffic light state
+        """
+
         return self._traffic_lights[0].state_counts(current_frame, previous_frame)
 
     def select_manually(self, image):
+        """
+        Allows user to select traffic light position manualy
+
+        :param image: image to select traffic light on
+        """
+
         rectangle = cv2.selectROI("select_traffic_light", image, showCrosshair=True)
         cv2.destroyWindow("select_traffic_light")
 
@@ -64,10 +96,25 @@ class TrafficLightsRepository(Repository):
         self.add_traffic_light(top_left=top_left, bottom_right=bottom_right)
 
     def add_traffic_light(self, top_left, bottom_right):
+        """
+        Adds traffic light to storage
+
+        :param top_left: top left anchor of traffic light
+        :param bottom_right: bottom right anchor of traffic light
+        """
+
         new_traffic_light = TrafficLight(top_left=top_left, bottom_right=bottom_right)
         self._traffic_lights.append(new_traffic_light)
 
     def find(self, image):
+        """
+        Uses neural net for finding traffic light on given image.
+        Only the best traffic light detection is added to storage.
+        Code inspired by: https://medium.com/@WuStangDan/step-by-step-tensorflow-object-detection-api-tutorial-part-5-saving-and-deploying-a-model-8d51f56dbcf1
+
+        :param image: selected image
+        """
+
         img_expanded = np.expand_dims(image, axis=0)
 
         (boxes, scores, classes) = self.sess.run(
@@ -85,12 +132,16 @@ class TrafficLightsRepository(Repository):
                 top_left = Coordinates(x_min, y_min, info=self._info)
                 bottom_right = Coordinates(x_max, y_max, info=self._info)
 
-                # print(box)
-                # print(top_left, bottom_right)
                 self.add_traffic_light(top_left=top_left, bottom_right=bottom_right)
                 break
 
     def draw(self, image):
+        """
+        Helper function for drawing detected traffic light position
+
+        :param image: selected image to draw on
+        :return: updated image
+        """
         for light in self._traffic_lights:
             light.draw_contours(image)
 
@@ -101,11 +152,29 @@ class TrafficLightsRepository(Repository):
 
 
 class TrafficLight:
+    """
+    Represents detected traffic light. Allows to detect current state of this light.
+    """
+
     def __init__(self, top_left, bottom_right):
+        """
+        :param top_left: top left anchor of detected traffic light
+        :param bottom_right: bottom right anchor of detected traffic light
+        """
         self._top_left = top_left.tuple()
         self._bottom_right = bottom_right.tuple()
 
     def state_counts(self, current_frame, previous_frame):
+        """
+        Returns relative counts of colors in every part of specified color spectre.
+        Uses HSV color model for filtering colors.
+        For error correction uses combination of current and previous frame
+
+        :param current_frame: current fram
+        :param previous_frame: previous frame
+        :return:
+        """
+
         current_light = current_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
         previous_light = previous_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
 
@@ -135,6 +204,12 @@ class TrafficLight:
             return red_count/all_count, orange_count/all_count, green_count/all_count
 
     def draw_contours(self, image):
+        """
+        Helper function for contoure drawing of detected traffic light
+
+        :param image: selected image to draw on
+        """
+
         cv2.rectangle(img=image,
                       pt1=self._top_left,
                       pt2=self._bottom_right,
@@ -142,6 +217,10 @@ class TrafficLight:
                       color=params.COLOR_YELLOW)
 
     def serialize(self):
+        """
+        :return: serialized traffic light
+        """
+
         return {"top left": list(self._top_left), "bottom right": list(self._bottom_right)}
 
 
