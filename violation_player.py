@@ -56,5 +56,11 @@ while True:
         cv2.rectangle(img=frame, pt1=tuple(top_left), pt2=tuple(bottom_right), color=color, thickness=3)
 
     cv2.imshow(annotation_input, frame)
-    cv2.waitKey(0)
+    key = cv2.waitKey(0)
+
+    if key & 0xFF == ord("q"):
+        exit()
+    if key & 0xFF == ord("p"):
+        cv2.imwrite("/Users/miro/Desktop/bp_photos/red_driver" + str(frame_counter) + ".png", frame)
+
     frame_counter += 1

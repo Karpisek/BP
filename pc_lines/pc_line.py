@@ -1,9 +1,7 @@
-import cv2
-import numpy as np
-from matplotlib import pyplot
-
 from .line import Line, NoIntersectionError, SamePointError, ransac, NotOnLineError
 import params
+
+from matplotlib import pyplot
 
 
 class ParametersNotDefinedError(Exception):
@@ -11,6 +9,12 @@ class ParametersNotDefinedError(Exception):
 
 
 class PcLines:
+    """
+    Implementation of parallel coordinate system.
+    Allows to convert cartesian point into PC line and cartesian line to PC point.
+    Implements straight and twisted space and transfer of coordinates between them suggested by Dubska et al.
+    """
+
     def __init__(self, width):
         self.delta = width
         self.t_space = []
@@ -18,10 +22,18 @@ class PcLines:
 
     @property
     def count(self) -> float:
+        """
+        :return: count of points present in straight and twisted space
+        """
         return len(self.t_space) + len(self.s_space)
 
     @property
     def s_points(self):
+        """
+        :return: points in straight space, if there are any points in twisted space - they are converted to
+        straight space using equation suggested by Dubska et al.
+        """
+
         s_points = [point[0] for point in self.s_space]
 
         for t_point in [point[0] for point in self.t_space]:
@@ -37,6 +49,11 @@ class PcLines:
 
     @property
     def t_points(self) -> [(float, float)]:
+        """
+        :return: points in twisted space, if there are any points in straight space - they are converted to
+        twisted space using equation suggested by Dubska et al.
+        """
+
         t_points = [point[0] for point in self.t_space]
 
         for s_point in [point[0] for point in self.s_space]:
@@ -51,28 +68,41 @@ class PcLines:
         return t_points
 
     def clear(self) -> None:
+        """
+        Clears point in both twisted and straight space
+        """
+
         self.t_space = []
         self.s_space = []
 
-    def find_most_lines_cross(self):
+    def find_most_lines_cross(self, write=False):
+        """
+        Finds intersection on lines given to PC space -> lines are represented as points so it uses
+        RANSAC algorithm for line aproximation, this line is then converted to cartesian coordinate system.
+        If the cross is near infinity an angle is returned instead.
 
-        pyplot.xlim((-2 * self.delta, 2 * self.delta))
-        pyplot.ylim((-2 * self.delta, 2 * self.delta))
+        :param write: if debug info should be writen to file
+        :return: detected line cross or angle if intersection near infinity
+        """
+
+        # pyplot.xlim((-2 * self.delta, 2 * self.delta))
+        # pyplot.ylim((-2 * self.delta, 2 * self.delta))
 
         line, ratio = ransac(creator_points=self.s_points,
                              voting_points=self.s_points,
-                             ransac_threshold=params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta)
+                             ransac_threshold=params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta,
+                             write=write)
+
+        # print(line)
 
         try:
             u1, v1 = line.find_coordinate(x=0)
             u2, v2 = line.find_coordinate(x=self.delta)
 
-            pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
-            self.plot()
+            # pyplot.plot([line.find_coordinate(x=-2 * self.delta)[0], line.find_coordinate(x=2 * self.delta)[0]], [line.find_coordinate(x=-2 * self.delta)[1], line.find_coordinate(x=2 * self.delta)[1]])
+            # self.plot()
 
-            pyplot.show()
-
-            print("ratio:", ratio)
+            # pyplot.show()
 
             return v1, v2
 
@@ -80,74 +110,25 @@ class PcLines:
             u1, v1 = line.find_coordinate(y=0)
             angle = (u1 + self.delta) * 180 / (2 * self.delta)
 
-            pyplot.plot([line.find_coordinate(y=-2 * self.delta)[0], line.find_coordinate(y=2 * self.delta)[0]], [line.find_coordinate(y=-2 * self.delta)[1], line.find_coordinate(y=2 * self.delta)[1]])
-            self.plot()
-
-            pyplot.show()
-
-            print("ratio:", ratio)
+            # pyplot.plot([line.find_coordinate(y=-2 * self.delta)[0], line.find_coordinate(y=2 * self.delta)[0]], [line.find_coordinate(y=-2 * self.delta)[1], line.find_coordinate(y=2 * self.delta)[1]])
+            # self.plot()
+            #
+            # pyplot.show()
 
             return angle, None
 
-
-
-    def pc_points(self, points=None, angles=None) -> [Line]:
-        created_lines = []
-
-        if points is not None:
-            for point in points:
-                x, y = point
-                try:
-                    created_lines.append(Line((self.delta, y), (0, x)))
-                except SamePointError:
-                    continue
-
-        if angles is not None:
-            for angle in angles:
-                u = (2 * self.delta / 180) * angle
-                try:
-                    created_lines.append(Line((u, 0), (u, 10)))
-                except SamePointError:
-                    continue
-
-        return created_lines
-
-    def ransac_from_preset(self, preset_pc_points: [Line]) -> (object, int):
-        # preset_x_coordinates, preset_y_coordinates = preset_points
-        # preset_x_coordinates = [int(x * params.CALIBRATOR_GRID_DENSITY - info.width / 2) for x in range(int((2 * info.width) / params.CALIBRATOR_GRID_DENSITY))]
-        # preset_y_coordinates = [int(y * params.CALIBRATOR_GRID_DENSITY - 9 * info.height / 10) for y in range(int(info.height / params.CALIBRATOR_GRID_DENSITY))]
-
-        best_line_ratio = 0
-        best_line = None
-
-        # print(len(self.s_points))
-
-        for line in preset_pc_points:
-            num = 0
-            ransac_threshold = self.delta * params.CALIBRATOR_RANSAC_THRESHOLD_RATIO
-
-            for point in self.s_points:
-                distance = line.point_distance(point)
-
-                if distance < ransac_threshold:
-                    num += 1
-
-            best_y = np.inf
-            if best_line is not None:
-                best_y = best_line.find_coordinate(x=self.delta)[1]
-
-            if num >= best_line_ratio:
-                if best_line is not None:
-                    if num == best_line_ratio:
-                        if line.find_coordinate(x=self.delta)[1] > best_y:
-                            continue
-
-                best_line_ratio = num
-                best_line = line
-
-        return best_line, best_line_ratio
-
     def add_to_pc_space(self, point1=None, point2=None, line=None):
+        """
+        Adds line to parallel coordinate space. Line can be represented by two points or a single line.
+        Tries to put them in straight space if possible. If there is not an option they are put in twisted space
+        instead.
+
+        :param point1: first point
+        :param point2: second point
+        :param line: line
+        :raise SamePointError if given points are the same
+        :raise ParametersNotDefined if not enough parameters are given. For example: only one point
+        """
 
         if line is not None:
             point1 = line.find_coordinate(x=0)
@@ -161,7 +142,6 @@ class PcLines:
         try:
             magnitude = Line(point1, point2).magnitude
         except SamePointError:
-            print("tady2")
             return
 
         l1_s = Line((0, x1), (self.delta, y1))
@@ -184,9 +164,11 @@ class PcLines:
         except NoIntersectionError:
             pass
 
-        print("tady")
-
     def plot(self) -> None:
+        """
+        Plots PC space debug information using matplotlib
+        """
+
         x_val = [x[0] for x in self.s_points]
         y_val = [x[1] for x in self.s_points]
 
@@ -202,49 +184,3 @@ class PcLines:
         #
         # pyplot.plot(x_val, y_val, 'bo')
         pyplot.show()
-
-    def debug_spaces_print(self, line, text=None) -> None:
-        image = np.zeros(shape=(2 * self.delta, 2 * self.delta, 3))
-
-        cv2.line(image, (int(self.delta), 0), (int(self.delta), 2 * self.delta), (255, 255, 255), 1)
-        cv2.line(image, (0, int(self.delta)), (2*self.delta, int(self.delta)), (255, 255, 255), 1)
-        #
-        # y1 = int(self.delta - line.find_coordinate(x=0)[1])
-        # y2 = int(self.delta - line.find_coordinate(x=self.delta)[1])
-        #
-        # x1 = self.delta
-        # x2 = 2 * self.delta
-        #
-        # #
-        # # print(line)
-        # # print((x1, y1), (x2, y2))
-        # # cv2.line(image, (x1, y1), (x2, y2), (0, 0, 255), int(params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta * 2))
-        #
-        # x1 = 0
-        # x2 = self.delta
-
-        point2 = int(self.delta + line.find_coordinate(x=0)[0]), int(self.delta - line.find_coordinate(x=0)[1])
-        point1 = int(self.delta + line.find_coordinate(x=-self.delta)[0]), int(self.delta - line.find_coordinate(x=-self.delta)[1])
-
-        cv2.line(image, point1, point2, (0, 0, 255), int(params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta * 2))
-
-        # for point in self.s_space:
-        #     x, y = point[0]
-        #
-        #     x = self.delta + x
-        #     y = self.delta - y
-        #
-        #     cv2.circle(image, (int(x), int(y)), 1, (255, 0, 0), 2)
-
-        for point in self.t_space:
-            x, y = point[0]
-
-            x = self.delta + x
-            y = self.delta - y
-
-            cv2.circle(image, (int(x), int(y)), 1, (0, 255, 0), 2)
-
-        if text is not None:
-            cv2.imwrite(f"ransac_{str(text)}.jpg", image)
-        else:
-            cv2.imwrite("ransac.jpg", image)

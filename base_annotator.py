@@ -47,13 +47,16 @@ class BaseAnnotator:
 
         self._before()
         while True:
-            image = self.video_info.read()
             try:
+                image = self.video_info.read()
                 self._step(seq, image)
             except EOFError:
                 break
 
             seq += 1
+
+            if seq % 100 == 0:
+                print("todo: ", seq, " ", self.video_info.frame_count)
 
         self._after()
 
@@ -64,6 +67,8 @@ class BaseAnnotator:
             print(len(self.annotations[key]))
 
         else:
+            print(self.annotations)
+            print(key, key2)
             self.annotations[key][key2].append(seq)
             print(len(self.annotations[key][key2]))
 
@@ -84,5 +89,4 @@ class BaseAnnotator:
                                 "orange": [],
                                 "red": [],
                                 "red_orange": []
-                            },
-                            "violations": []}
+                            }}

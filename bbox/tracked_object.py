@@ -1,14 +1,14 @@
 import cv2
 import numpy as np
-
 import params
+
 from bbox.size import ObjectSize
 from bbox.coordinates import Coordinates
-from pc_lines.line import Line, SamePointError, NotOnLineError
+from pc_lines.line import Line, SamePointError
+from pipeline.base.pipeline import Mode
 
 BOX_THICKNESS = 2
 CENTER_POINT_RADIUS = 2
-
 
 KALMAN_TRANSITION_MATRIX = np.array([
     [1, 0, 1, 0],
@@ -51,7 +51,16 @@ class TooManyCarsError(Exception):
 
 
 class TrackedObjectsRepository:
+    """
+    Repository for tracked object. Allows to create, update and remove tracked objects.
+    Removes tracked objects if their position is outside specified area.
+    """
+
     def __init__(self, info):
+        """
+        :param info: instance of InputInfo
+        """
+
         self._id_counter = 0
         self._lifelines = []
         self._collected_lifelines_id = []
@@ -60,13 +69,30 @@ class TrackedObjectsRepository:
 
     @property
     def list(self):
+        """
+        :return: list of tracked objects
+        """
+
         return self._tracked_objects
 
     @property
     def lifelines(self):
+        """
+        :return: list of trajectories of tracked objects
+        """
+
         return self._lifelines
 
     def new_tracked_object(self, coordinates, size, confident_score, _):
+        """
+        Creates new tracked object. If it found collision with existing tracked object these objects are marget
+        together. Colision is defined by percentage of overlap
+
+        :param coordinates: new coordinates
+        :param size: size of new object
+        :param confident_score: how certain we are about this object
+        :param _: ANY
+        """
 
         new_object = TrackedObject(coordinates=coordinates,
                                    size=size,
@@ -76,7 +102,7 @@ class TrackedObjectsRepository:
 
         collision = False
         for index, tracked_object in enumerate(self._tracked_objects[:]):
-            if tracked_object.overlap(new_object) > 0.1:
+            if tracked_object.overlap(new_object) > params.TRACKER_MAX_OVERLAP:
                 new_object.id = tracked_object.id
                 self._tracked_objects[index] = new_object
                 collision = True
@@ -87,9 +113,18 @@ class TrackedObjectsRepository:
             self._id_counter += 1
 
     def count(self) -> int:
+        """
+        :return: count of currently tracked objects
+        """
+
         return len(self._tracked_objects)
 
     def all_boxes_mask(self, area_size="inner"):
+        """
+        :param area_size: specified area of boxes.
+        :return: created mask
+        """
+
         height = self._info.height
         width = self._info.width
         global_mask = np.zeros(shape=(height, width),
@@ -104,106 +139,95 @@ class TrackedObjectsRepository:
         return global_mask
 
     def predict(self) -> None:
+        """
+        Predicts positions on all tracked objects
+        """
+
         for tracked_object in self._tracked_objects:
             tracked_object.predict()
 
-    def control_boxes(self) -> None:
+    def control_boxes(self, mode) -> None:
+        """
+        checks every tracked object if they satisfy all condition to be tracked.
+        Different workmodes have different conditions to be tracked.
+
+        :param mode: current work mode
+        """
 
         for tracked_object in self._tracked_objects:
             if tracked_object.id not in self._collected_lifelines_id:
-                if tracked_object.tracker_point not in self._info.update_area:
-                    if tracked_object.history.y > tracked_object.tracker_point.y:
-                        self.lifelines.append((tracked_object.history.tuple(), tracked_object.center.tuple()))
-                        self._collected_lifelines_id.append(tracked_object.id)
+                if tracked_object.tracker_point not in self._info.update_area or (mode == Mode.CALIBRATION_VP and tracked_object.center not in self._info.update_area):
+                    self.lifelines.append(tracked_object.history)
+                    self._collected_lifelines_id.append(tracked_object.id)
+                else:
+                    tracked_object.update_history()
 
-            if tracked_object.tracker_point not in self._info.corridors_repository or tracked_object.tracker_point not in self._info.update_area:
+            if tracked_object.tracker_point not in self._info.corridors_repository:
                 self._tracked_objects.remove(tracked_object)
 
+            elif tracked_object.tracker_point not in self._info.update_area:
+                self._tracked_objects.remove(tracked_object)
+
+            elif self._info.corridors_repository.behind_line(tracked_object.tracker_point):
+                tracked_object.lifetime -= 1
+                if tracked_object.lifetime <= 0:
+                    self._tracked_objects.remove(tracked_object)
+
     def serialize(self):
+        """
+        Serializes all tracked object in list
+        :return: serialized tracked objects
+        """
+
         return [tracked_object.serialize() for tracked_object in self._tracked_objects]
 
     def restart(self):
+        """
+        Clears this repository
+        """
+
         self._id_counter = 0
         self._lifelines = []
         self._tracked_objects = []
 
 
 class TrackedObject:
-
-    @staticmethod
-    def draw_lifelines(image, lifelines=None, color=params.COLOR_RED, thickness=1) -> np.ndarray:
-        if lifelines is not None:
-            for line in lifelines:
-
-                mask = np.zeros_like(image)
-
-                p1, p2 = line
-
-                try:
-                    l = Line(p1, p2)
-                    l.draw(mask, color, thickness)
-                    image = cv2.add(image, mask)
-                except SamePointError:
-                    continue
-                except NotOnLineError:
-                    raise
-
-        return image
-
-    @staticmethod
-    def lifeline_convex_hull(info, lifelines=None) -> np.ndarray:
-        if lifelines is not None:
-
-            contours = []
-            for line in lifelines:
-                try:
-                    l = Line(*line)
-                except SamePointError:
-                    continue
-
-                p1 = tuple([int(cord) for cord in l.find_coordinate(y=0)])
-                p2 = tuple([int(cord) for cord in l.find_coordinate(y=info.height)])
-
-                if p2[0] < 0 or p2[0] > info.width:
-                    continue
-
-                contours.append([p1])
-                contours.append([p2])
-
-            hull = cv2.convexHull(np.array(contours))
-
-            return hull
+    """
+    Represents one tracked object
+    Uses Kalman Filter to predict his position. Two possible mesurement are allowed -> position and velocity.
+    Stores history of center points to construct trajectories.
+    """
 
     @staticmethod
     def filter_lifelines(lifelines, vp1):
+        """
+        Filters given trajectories by those which have direction ti the first vanishing point.
+
+        :param lifelines: given trajectories
+        :param vp1: detected vanishing point
+        :return: filtered trajectories
+        """
+
         filtered = []
 
         for lifeline in lifelines:
             line_to_vp = Line(lifeline[0], vp1.point)
-            lifeline_line = Line(lifeline[0], lifeline[1])
 
-            if 30 < lifeline_line.angle(line_to_vp) < 150:
+            try:
+                lifeline_line = Line(lifeline[0], lifeline[-1])
+            except SamePointError:
                 continue
+
+            if params.TRACKER_TRAJECTORY_MIN_ANGLE < lifeline_line.angle(line_to_vp) < params.TRACKER_TRAJECTORY_MAX_ANGLE:
+                continue
+
+            elif lifeline[0][1] < lifeline[-1][1]:
+                continue
+
             else:
                 filtered.append(lifeline)
 
         return filtered
-
-    @staticmethod
-    def draw(image, boxes, lifelines=None) -> np.ndarray:
-
-        for box in boxes:
-            anchors, area_of_interest, car_info = box
-
-            top_left, bot_right, center_point = anchors
-
-            cv2.circle(image, center_point, area_of_interest, params.COLOR_BLUE, BOX_THICKNESS)
-            cv2.putText(image, car_info, top_left, 1, 1, params.COLOR_WHITE, 2)
-
-        if lifelines is not None:
-            return TrackedObject.draw_lifelines(image, lifelines)
-        else:
-            return image
 
     def __init__(self, coordinates, size, confident_score, info, object_id):
 
@@ -235,42 +259,77 @@ class TrackedObject:
             [np.float32(0)],  # dy
         ])
 
-        self._start_coordinates = self.center
+        self._history = [self.center.tuple()]
 
     @property
     def flow(self):
+        """
+        :return: pixel flow of tracked object from last mesurement
+        """
+
         return self._kalman.statePost[2][0], self._kalman.statePost[3][0]
 
     @property
     def history(self):
-        return self._start_coordinates
+        """
+        :return: list of history center points
+        """
+        return self._history
 
     @property
     def tracker_point(self):
+        """
+        :return: middle point on bottom edge of tracked object
+        """
+
         return Coordinates(x=self.center.x, y=int(self.center.y + self.size.height/2))
 
     @property
     def id(self) -> int:
+        """
+        :return: id of tracked object
+        """
+
         return self._id
 
     @id.setter
     def id(self, value):
+        """
+        sets ID of tracked object
+        """
+
         self._id = value
 
     @property
     def center(self):
+        """
+        :return: center Coordinates of trakced object
+        """
+
         return Coordinates(int(self._kalman.statePost[0][0]), int(self._kalman.statePost[1][0]))
 
     @property
     def size(self) -> (int, int):
+        """
+        :return: size of tracked object
+        """
+
         return self._current_size
 
     @property
     def velocity(self) -> int:
+        """
+        :return: velocity of tracked object rounded to nearest integer
+        """
+
         return int(self._velocity)
 
     @property
     def left_top_anchor(self):
+        """
+        :return: top left anchor of tracked object
+        """
+
         x = int((self.center.x - self.size.width / 2))
         y = int((self.center.y - self.size.height / 2))
 
@@ -278,6 +337,10 @@ class TrackedObject:
 
     @property
     def left_bot_anchor(self):
+        """
+        :return: left bot anchor of tracked object
+        """
+
         x = int((self.center.x - self.size.width / 2))
         y = int((self.center.y + self.size.height / 2))
 
@@ -285,6 +348,10 @@ class TrackedObject:
 
     @property
     def right_top_anchor(self):
+        """
+        :return: top right anchor of tracked object
+        """
+
         x = int((self.center.x + self.size.width / 2))
         y = int((self.center.y - self.size.height / 2))
 
@@ -292,6 +359,10 @@ class TrackedObject:
 
     @property
     def right_bot_anchor(self):
+        """
+        :return: right bot anchor of tracked object
+        """
+
         x = int((self.center.x + self.size.width / 2))
         y = int((self.center.y + self.size.height / 2))
 
@@ -299,13 +370,36 @@ class TrackedObject:
 
     @property
     def car_info(self) -> str:
+        """
+        :return: info about tracked object - ID of tracked object
+        """
+
         return str(self._id)
 
     @property
     def radius(self):
+        """
+        :return: radius around tracked object specified by diagonal line
+        """
+
         return int(np.sqrt(self.size.width * self.size.width + self.size.height * self.size.height) / 2)
 
+    def update_history(self):
+        """
+        Signal to update history of this tracked object. It controls if enough Y coordinate diference was made.
+        If so it saves current position to history.
+        """
+
+        if np.abs(self.center.y - self._history[-1][1]) > params.TRACKER_HISTORY_DIFFERENCE:
+            self._history.append(self.center.tuple())
+
     def overlap(self, overlapping_object):
+        """
+        Checks if this tracked objects overlaps with selected object.
+
+        :param overlapping_object: tracked object to compare
+        :return: percentage of overlap
+        """
 
         x_min = np.max((self.left_top_anchor.x, overlapping_object.left_top_anchor.x))
         y_min = np.max((self.left_top_anchor.y, overlapping_object.left_top_anchor.y))
@@ -328,11 +422,22 @@ class TrackedObject:
         return overlapped_square_size / self.square_size()
 
     def square_size(self):
+        """
+        :return: square size of tracked object
+        """
+
         return self.size.width * self.size.height
 
     def area(self, area_size) -> int:
+        """
+        Defining multiple areas around object.
+
+        :param area_size: selected area size
+        :return: radius of selected area
+        """
+
         if area_size == "inner":
-            return self.radius if self.radius < 20 else 20
+            return self.radius if self.radius < 30 else 30
 
         if area_size == "outer":
             return self.radius
@@ -343,10 +448,19 @@ class TrackedObject:
         else:
             return 0
 
-    def anchors(self) -> ((int, int), (int, int), (int, int), (int, int)):
+    def anchors(self) -> ((int, int), (int, int), (int, int)):
+        """
+        :return: 2 anchors describing this tracked object and center point.
+        """
+
         return self.left_top_anchor.tuple(), self.right_bot_anchor.tuple(), self.center.tuple()
 
     def predict(self) -> ((float, float), (float, float)) or None:
+        """
+        Predicts new position of tracked object using Kalman Filter.
+        Adjusts size of object depending on distance to vanishing point.
+        """
+
         self._kalman.predict()
 
         if self._info.vp1 is not None:
@@ -362,6 +476,15 @@ class TrackedObject:
             self._current_size = self._reference_object_size
 
     def update_position(self, size, score, new_coordinates):
+        """
+        Updates Kalman filter by mesurement of new position of tracked object.
+
+        :param size: measured object size
+        :param score: measured object score
+        :param new_coordinates: coordinates of measured object
+        :return:
+        """
+
         mesurement = np.array([
             [np.float32(new_coordinates.x)],
             [np.float32(new_coordinates.y)],
@@ -378,6 +501,15 @@ class TrackedObject:
         self._reference_coordinates = new_coordinates
 
     def update_flow(self, old_positions, new_positions) -> None:
+        """
+        Updates Kalman filter by mesurement of optical flow in scene.
+        Tracked object position difference is extracted from complete optical flow of the scene using selected
+        area around this tracked object.
+
+        :param old_positions: old positions
+        :param new_positions: new positions
+        """
+
         x_flow, y_flow = self.extract_flow(old_positions, new_positions)
 
         mesurement = np.array([
@@ -392,9 +524,19 @@ class TrackedObject:
         self._kalman.correct(mesurement)
 
     def in_area(self, new_coordinates):
+        """
+        :param new_coordinates: selected coordinates coordinates
+        :return: checks if selected coordinates are in area of tracked object
+        """
+
         return self.left_top_anchor.x < new_coordinates.x < self.right_bot_anchor.x and self.left_top_anchor.y < new_coordinates.y < self.right_bot_anchor.y
 
     def in_radius(self, new_coordinates) -> int:
+        """
+        :param new_coordinates: selected coordinates
+        :return: checks if selected coordinates are in certain radius around center of tracked object
+        """
+
         width = self.size.width
         height = self.size.height
 
@@ -405,6 +547,12 @@ class TrackedObject:
         return self.center.distance(new_coordinates) < max_pixels
 
     def extract_flow(self, old_positions, new_positions) -> (float, float):
+        """
+        Extracts optical flow for this tracked object. Optical flow is selected using an area around center point of
+        this tracked object.
+
+        :return: extracted flow corresponding to this tracked object
+        """
 
         global_dx = 0
         global_dy = 0
@@ -431,6 +579,16 @@ class TrackedObject:
             return 0, 0
 
     def mask(self, width, height, area_size="inner", color=params.COLOR_WHITE_MONO) -> np.ndarray:
+        """
+        Creates (binary) mask of circle area around this tracked object in scene
+
+        :param width: width of image
+        :param height: height of image
+        :param area_size: size of selected area
+        :param color: color of mask
+        :return: generated mask
+        """
+
         mask = np.zeros(shape=(height, width), dtype=np.uint8)
         cv2.circle(img=mask,
                    center=self.center.tuple(),
@@ -441,11 +599,8 @@ class TrackedObject:
         return mask
 
     def serialize(self):
+        """
+        :return: serialized tracked object: anchors, area, car info and velocity
+        """
+
         return self.anchors(), self.area(area_size="outer"), self.car_info, self.velocity
-
-    def __del__(self):
-        pass
-        # only lifelines from bot to top
-        # if self.center.y < self.history.y:
-        #     Box2D._lifelines.append((self.history.tuple(), self.center.tuple()))
-

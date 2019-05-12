@@ -7,7 +7,15 @@ class ParametersError(Exception):
 
 
 class InputParser:
+    """
+    Used for program argument parsing
+    """
+
     def __init__(self, argv):
+        """
+        :param argv: program arguments
+        """
+
         try:
             opts, args = getopt.getopt(argv, "lc", ["light", "corridors", "input=", "output="])
 
@@ -35,16 +43,32 @@ class InputParser:
 
     @property
     def insert_light(self):
+        """
+        :return: if user wants to select lights manualy
+        """
+
         return self._light
 
     @property
     def insert_corridors(self):
+        """
+        :return: if user wants to select corridors manualy
+        """
+
         return self._corridors
 
     @property
     def input_video(self):
+        """
+        :return: path of input video
+        """
+
         return self._input
 
     @property
     def output_dir(self):
+        """
+        :return: output directory path
+        """
+
         return self._output
