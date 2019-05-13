@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-import params
+import constants
 
 LK_PARAMS = dict(winSize=(31, 31),
                  maxLevel=7,
@@ -35,11 +35,11 @@ class OpticalFlow:
             a, b = new.ravel()
             c, d = old.ravel()
 
-            cv2.circle(image, (int(c), int(d)), 3, params.COLOR_RED, 1)
+            cv2.circle(image, (int(c), int(d)), 3, constants.COLOR_RED, 1)
             cv2.line(img=image,
                      pt1=(int(a), int(b)),
                      pt2=(int(c), int(d)),
-                     color=params.COLOR_RED,
+                     color=constants.COLOR_RED,
                      thickness=2)
 
         return image
@@ -59,9 +59,9 @@ class OpticalFlow:
         self._info = info
         self._doter = np.zeros(shape=(info.height, info.width), dtype=np.uint8)
 
-        for x in range(int(info.width / params.OPTICAL_FLOW_GRID_DENSITY)):
-            for y in range(int(info.height / params.OPTICAL_FLOW_GRID_DENSITY)):
-                self._doter[y * params.OPTICAL_FLOW_GRID_DENSITY][x * params.OPTICAL_FLOW_GRID_DENSITY] = 255
+        for x in range(int(info.width / constants.OPTICAL_FLOW_GRID_DENSITY)):
+            for y in range(int(info.height / constants.OPTICAL_FLOW_GRID_DENSITY)):
+                self._doter[y * constants.OPTICAL_FLOW_GRID_DENSITY][x * constants.OPTICAL_FLOW_GRID_DENSITY] = 255
 
     @property
     def tracked_point_count(self):
@@ -87,8 +87,8 @@ class OpticalFlow:
                 cv2.circle(img=mask_for_detection,
                            center=tracked_object.center.tuple(),
                            radius=tracked_object.area("outer"),
-                           color=params.COLOR_WHITE_MONO,
-                           thickness=params.FILL)
+                           color=constants.COLOR_WHITE_MONO,
+                           thickness=constants.FILL)
 
             if self.tracked_point_count:
                 moved_grid, st, err = cv2.calcOpticalFlowPyrLK(prevImg=self._previous_image,

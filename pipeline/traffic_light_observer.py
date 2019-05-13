@@ -1,6 +1,6 @@
 import numpy as np
 
-import params
+import constants
 from pipeline import ThreadedPipeBlock, is_frequency
 from pipeline.base.pipeline import Mode
 from repositories.traffic_light_repository import Color
@@ -21,7 +21,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         :param output: list of PipeBlock output instances
         """
 
-        super().__init__(info=info, output=output, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+        super().__init__(info=info, output=output, pipe_id=constants.TRAFFIC_LIGHT_OBSERVER_ID)
 
         self._state = None
         self._state_values = [0, 0, 0]
@@ -53,18 +53,18 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         :param seq: current sequnece number
         """
 
-        loader_seq, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
+        loader_seq, new_frame = self.receive(pipe_id=constants.FRAME_LOADER_ID)
 
         new_status = self.status(current_frame=new_frame, previous_frame=self._previous_frame)
         self._previous_frame = new_frame
 
         message = seq, new_status
 
-        if is_frequency(seq, params.OBSERVER_FREQUENCY):
-            self.send(message, pipe_id=params.OBSERVER_ID)
+        if is_frequency(seq, constants.OBSERVER_FREQUENCY):
+            self.send(message, pipe_id=constants.OBSERVER_ID)
 
-        if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
-            self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
+        if is_frequency(seq, constants.CALIBRATOR_FREQUENCY):
+            self.send(message, pipe_id=constants.CALIBRATOR_ID, block=False)
 
     def status(self, current_frame, previous_frame):
         """
@@ -84,7 +84,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
         diff = np.around(np.absolute(new_status - self._state_values), decimals=1)
 
         if self._state == Color.RED:
-            if diff[1] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
+            if diff[1] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
                 if self._state_candidate == Color.RED_ORANGE:
                     self._state_candidate_count += 1
                 else:
@@ -92,7 +92,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
                 self._state_candidate = Color.RED_ORANGE
 
         elif self._state == Color.RED_ORANGE:
-            if diff[1] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > params.TRAFFIC_LIGHT_GREEN_THRESHOLD or diff[2] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
+            if diff[1] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > constants.TRAFFIC_LIGHT_GREEN_THRESHOLD or diff[2] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
                 if self._state_candidate == Color.GREEN:
                     self._state_candidate_count += 1
                 else:
@@ -103,7 +103,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
             if new_status.max() == 0:
                 self._state = Color.GREEN
 
-            elif diff[1] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[2] > params.TRAFFIC_LIGHT_GREEN_THRESHOLD:
+            elif diff[1] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[2] > constants.TRAFFIC_LIGHT_GREEN_THRESHOLD:
                 if self._state_candidate == Color.ORANGE:
                     self._state_candidate_count += 1
                 else:
@@ -112,7 +112,7 @@ class TrafficLightsObserver(ThreadedPipeBlock):
                 self._state_candidate = Color.ORANGE
 
         elif self._state == Color.ORANGE:
-            if diff[1] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > params.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
+            if diff[1] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD or diff[0] > constants.TRAFFIC_LIGHT_DEFAULT_THRESHOLD:
                 if self._state_candidate == Color.RED:
                     self._state_candidate_count += 1
                 else:

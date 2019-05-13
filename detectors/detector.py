@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import params
+import constants
 
 from bbox import ObjectSize, Coordinates
 from pipeline import ThreadedPipeBlock
@@ -16,7 +16,7 @@ class Detector(ThreadedPipeBlock):
     def _mode_changed(self, new_mode):
         pass
 
-    def __init__(self, info, model, output=None, detector_type_id=params.DETECTOR_CAR_ID, block=True, max_steps=np.inf):
+    def __init__(self, info, model, output=None, detector_type_id=constants.DETECTOR_CAR_ID, block=True, max_steps=np.inf):
         """
         :param info: instance of InputInfo
         :param model: path to trained object detection model
@@ -54,7 +54,7 @@ class Detector(ThreadedPipeBlock):
         :param seq:
         :return:
         """
-        seq, image = self.receive(params.FRAME_LOADER_ID)
+        seq, image = self.receive(constants.FRAME_LOADER_ID)
         img_expanded = np.expand_dims(image, axis=0)
 
         (boxes, scores, classes, _) = self.sess.run(
@@ -82,10 +82,10 @@ class Detector(ThreadedPipeBlock):
         for _, squad in enumerate(zip(boxes, scores, classes)):
             box, score, class_id = squad
 
-            if score < params.DETECTOR_MINIMAL_SCORE:
+            if score < constants.DETECTOR_MINIMAL_SCORE:
                 break
 
-            if class_id not in params.DETECTOR_CAR_CLASSES_IDS:
+            if class_id not in constants.DETECTOR_CAR_CLASSES_IDS:
                 continue
 
             center, size = self.convert_box_to_centroid_object(box)

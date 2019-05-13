@@ -1,8 +1,16 @@
+"""
+VideoWriter class definition
+"""
+
+__author__ = "Miroslav Karpisek"
+__email__ = "xkarpi05@stud.fit.vutbr.cz"
+__date__ = "14.5.2019"
+
 import json
 import shutil
 import cv2
 import os
-import params
+import constants
 
 from collections import deque
 from copy import deepcopy
@@ -34,7 +42,7 @@ class ViolationWriter(ThreadedPipeBlock):
         :param program_arguments: instance of Parser used for setting root directory of output directory
         """
 
-        super().__init__(info=info, pipe_id=params.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
+        super().__init__(info=info, pipe_id=constants.VIOLATION_WRITER_ID, work_modes=[Mode.DETECTION], deamon=False)
         self._video_writers = {}
         self._captured_ids = []
         self._light_states = {"red": [],
@@ -46,7 +54,7 @@ class ViolationWriter(ThreadedPipeBlock):
         self._current_light_state = None
         self._last_boxes_repository = None
         self._path = f"{program_arguments.output_dir}/{self._info.filename}"
-        self._history = deque(maxlen=params.VIOLATION_WRITER_SEQUENCE_LENGTH)
+        self._history = deque(maxlen=constants.VIOLATION_WRITER_SEQUENCE_LENGTH)
 
     def _before(self):
         """
@@ -70,10 +78,10 @@ class ViolationWriter(ThreadedPipeBlock):
         :param seq: current sequence number
         """
 
-        self.receive(pipe_id=params.VIDEO_PLAYER_ID)
+        self.receive(pipe_id=constants.VIDEO_PLAYER_ID)
 
-        loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
+        loader_seq, image = self.receive(pipe_id=constants.FRAME_LOADER_ID)
+        observer_seq, boxes_repository, lights_state = self.receive(pipe_id=constants.OBSERVER_ID)
         package = image, boxes_repository, lights_state
 
         self._save_light_state(lights_state, seq)
@@ -123,7 +131,7 @@ class ViolationWriter(ThreadedPipeBlock):
         :param package: package which should be added to history
         """
 
-        if len(self._history) == params.VIDEO_WRITER_HISTORY:
+        if len(self._history) == constants.VIDEO_WRITER_HISTORY:
             self._history.popleft()
 
         self._history.append(package)
@@ -134,7 +142,7 @@ class ViolationWriter(ThreadedPipeBlock):
         """
 
         if self._last_boxes_repository is not None:
-            path = f"{self._path}/{str(self._info.calibration_mode)}_{params.STATISTICS_LOG_FILENAME}"
+            path = f"{self._path}/{str(self._info.calibration_mode)}_{constants.STATISTICS_LOG_FILENAME}"
 
             with open(path, "w") as file:
                 data = self._last_boxes_repository.get_statistics()
@@ -147,7 +155,7 @@ class ViolationWriter(ThreadedPipeBlock):
         Write calibration information to selected file
         """
 
-        path = f"{self._path}/{str(self._info.calibration_mode)}_{params.CALIBRATION_FILENAME}"
+        path = f"{self._path}/{str(self._info.calibration_mode)}_{constants.CALIBRATION_FILENAME}"
 
         with open(path, "w") as file:
             data = self._info.get_calibration()

@@ -4,7 +4,7 @@ import sys
 
 import cv2
 
-from params import COLOR_RED, COLOR_ORANGE, COLOR_GREEN
+from constants import COLOR_RED, COLOR_ORANGE, COLOR_GREEN
 from pipeline.observer import CarBehaviourMode
 from pipeline.parser import ParametersError
 

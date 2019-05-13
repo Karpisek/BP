@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import params
+import constants
 
 from pc_lines.line import Line, SamePointError
 from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
@@ -92,11 +92,14 @@ class TrafficCorridorRepository:
         left_edge_point = self.stopline.edge_points(info=self._info)[0]
         right_edge_point = self.stopline.edge_points(info=self._info)[1]
 
-        self._stop_line = Line(point1=(left_edge_point[0], left_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET),
-                               point2=(right_edge_point[0], right_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET))
+        self._stop_line = Line(point1=(left_edge_point[0], left_edge_point[1] - constants.CORRIDORS_STOP_LINE_OFFSET),
+                               point2=(right_edge_point[0], right_edge_point[1] - constants.CORRIDORS_STOP_LINE_OFFSET))
 
-        top_line = Line(point1=(left_edge_point[0], 2 * left_edge_point[1] / 3),
-                        point2=(right_edge_point[0], 2 * right_edge_point[1] / 3))
+        left_edge_point = self.stopline.edge_points(info=self._info)[0]
+        right_edge_point = self.stopline.edge_points(info=self._info)[1]
+
+        top_line = Line(point1=(left_edge_point[0], 3 * left_edge_point[1] / 5),
+                        point2=(right_edge_point[0], 3 * right_edge_point[1] / 5))
 
         self._info.update_area.change_area(top_line=top_line)
 
@@ -162,7 +165,7 @@ class TrafficCorridorRepository:
             return False
 
         red_line_point = self.stopline.find_coordinate(x=coordinates.x)
-        return previous_coordinates.y > red_line_point[1] > coordinates.y
+        return previous_coordinates.y >= red_line_point[1] > coordinates.y
 
     def behind_line(self, coordinates):
         """
@@ -206,14 +209,14 @@ class TrafficCorridorRepository:
             for key, corridor in self._corridors.items():
                 corridor.draw_corridor(image=image,
                                        info=self._info,
-                                       color=params.RANDOM_COLOR[key],
+                                       color=constants.RANDOM_COLOR[key],
                                        fill=fill)
 
         image = cv2.bitwise_and(image, image, mask=self._corridor_mask)
 
         if self._stopline_found:
             self.stopline.draw(image=image,
-                               color=params.COLOR_RED,
+                               color=constants.COLOR_RED,
                                thickness=5)
 
         return image
@@ -280,7 +283,7 @@ class TrafficCorridorRepository:
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
         edge_grey_blured = cv2.medianBlur(edge_grey, 11)
-        _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+        _, threshold = cv2.threshold(edge_grey_blured, 50, 255, cv2.THRESH_BINARY)
         threshold = cv2.dilate(threshold, (5, 5), iterations=5)
 
         height, width = edge_grey_blured.shape
@@ -342,7 +345,7 @@ class TrafficCorridorRepository:
 
         self._stop_places.append(coordinates)
 
-        if len(self._stop_places) >= params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
+        if len(self._stop_places) >= constants.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
             self.find_stop_line()
 
     def find_stop_line(self):
@@ -373,7 +376,7 @@ class TrafficCorridorRepository:
                 line = Line(point1=point2.tuple(), direction=vp2.direction)
 
             num = 0
-            ransac_threshold = params.CORRIDORS_RANSAC_THRESHOLD
+            ransac_threshold = constants.CORRIDORS_RANSAC_THRESHOLD
             for point in self._stop_places:
                 distance = line.point_distance(point.tuple())
 
@@ -424,7 +427,7 @@ class TrafficCorridor:
 
         return self._id
 
-    def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
+    def draw_corridor(self, image, info, color=None, fill=True, thickness=constants.DEFAULT_THICKNESS):
         """
         Helper function for drawing corridor
 
@@ -530,8 +533,8 @@ class LineDrag:
             cv2.line(img=image,
                      pt1=self.point1,
                      pt2=self.point2,
-                     color=params.COLOR_GREEN,
-                     thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
+                     color=constants.COLOR_GREEN,
+                     thickness=constants.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def clear(self):
         """
@@ -581,7 +584,7 @@ class StopLineMaker(LineDrag):
         super().draw(image)
 
         if self.line is not None:
-            self.line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
+            self.line.draw(image, color=constants.COLOR_RED, thickness=constants.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def run(self, info) -> []:
         """
@@ -602,7 +605,7 @@ class StopLineMaker(LineDrag):
             key = cv2.waitKey(1)
 
             if key == 13:
-                self.line.draw(image_copy, params.COLOR_BLUE, params.CORRIDORS_LINE_SELECTOR_THICKNESS)
+                self.line.draw(image_copy, constants.COLOR_BLUE, constants.CORRIDORS_LINE_SELECTOR_THICKNESS)
                 cv2.imshow("select_stop_line", image_copy)
 
                 key = cv2.waitKey(0)
@@ -658,7 +661,7 @@ class CorridorMaker(LineDrag):
         super().draw(image)
 
         for line in self.selected:
-            line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
+            line.draw(image, color=constants.COLOR_RED, thickness=constants.CORRIDORS_LINE_SELECTOR_THICKNESS)
 
     def __iter__(self):
         return iter(self.selected)
@@ -701,7 +704,7 @@ class CorridorMaker(LineDrag):
 
             if key == 13:
                 for line in self:
-                    line.draw(image_copy, params.COLOR_BLUE, params.CORRIDORS_LINE_SELECTOR_THICKNESS)
+                    line.draw(image_copy, constants.COLOR_BLUE, constants.CORRIDORS_LINE_SELECTOR_THICKNESS)
                     cv2.imshow("select_corridors", image_copy)
 
                 key = cv2.waitKey(0)

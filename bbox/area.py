@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import params
+import constants
 
 from pc_lines.line import Line
 
@@ -120,13 +120,13 @@ class Area:
 
         mask = np.zeros(shape=(self._info.height, self._info.width), dtype=np.uint8)
 
-        self.draw(image=mask, color=params.COLOR_WHITE_MONO)
+        self.draw(image=mask, color=constants.COLOR_WHITE_MONO)
 
         mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
 
         cv2.floodFill(image=mask,
                       mask=mask_with_border,
                       seedPoint=(int(self.middle_point[0]), int(self.middle_point[1])),
-                      newVal=params.COLOR_WHITE_MONO)
+                      newVal=constants.COLOR_WHITE_MONO)
 
         return mask

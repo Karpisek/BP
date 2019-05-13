@@ -1,6 +1,6 @@
 import numpy as np
 
-import params
+import constants
 from bbox import Coordinates
 from pc_lines.line import Line
 
@@ -31,7 +31,7 @@ class VanishingPoint:
         if point is not None:
             self.infinity = False
             x, y = point
-            self._point = int(np.clip(x, params.UINT_MIN, params.UINT_MAX)), int(np.clip(y, params.UINT_MIN, params.UINT_MAX))
+            self._point = int(np.clip(x, constants.UINT_MIN, constants.UINT_MAX)), int(np.clip(y, constants.UINT_MIN, constants.UINT_MAX))
 
         # in case vanishing point is near infinity
         if direction is not None:

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-import params
+import constants
 
 
 class SamePointError(Exception):
@@ -354,8 +354,8 @@ class Line:
             p1 = [int(cord) for cord in self.find_coordinate(x=0)]
             p2 = [int(cord) for cord in self.find_coordinate(x=w)]
 
-        p1 = int(np.clip(p1[0], params.UINT_MIN, params.UINT_MAX)), int(np.clip(p1[1], params.UINT_MIN, params.UINT_MAX))
-        p2 = int(np.clip(p2[0], params.UINT_MIN, params.UINT_MAX)), int(np.clip(p2[1], params.UINT_MIN, params.UINT_MAX))
+        p1 = int(np.clip(p1[0], constants.UINT_MIN, constants.UINT_MAX)), int(np.clip(p1[1], constants.UINT_MIN, constants.UINT_MAX))
+        p2 = int(np.clip(p2[0], constants.UINT_MIN, constants.UINT_MAX)), int(np.clip(p2[1], constants.UINT_MIN, constants.UINT_MAX))
 
         cv2.line(image, tuple(p1), tuple(p2), color, thickness)
 

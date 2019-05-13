@@ -4,7 +4,7 @@ import cv2
 import tensorflow as tf
 import numpy as np
 
-import params
+import constants
 from bbox import Coordinates
 
 
@@ -76,7 +76,19 @@ class TrafficLightsRepository:
         :return: detected traffic light state
         """
 
-        return self._traffic_lights[0].state_counts(current_frame, previous_frame)
+        best_value = 0
+        best_state = None
+
+        for light in self._traffic_lights:
+            value, red, orange, green = light.state_counts(current_frame, previous_frame)
+
+            if value > best_value:
+                best_state = red, orange, green
+
+        if best_state is None:
+            return 0, 0, 0
+        else:
+            return best_state
 
     def select_manually(self, image):
         """
@@ -123,17 +135,16 @@ class TrafficLightsRepository:
 
         for box, score, class_id in list(zip(boxes[0], scores[0], classes[0])):
 
-            if score < 0.5:
+            if score < constants.DETECTOR_LIGHT_MINIMAL_SCORE:
                 break
 
-            if class_id == 10:
+            if class_id == constants.TRAFFIC_LIGHT_CLASS_ID:
                 y_min, x_min, y_max, x_max = box
 
                 top_left = Coordinates(x_min, y_min, info=self._info)
                 bottom_right = Coordinates(x_max, y_max, info=self._info)
 
                 self.add_traffic_light(top_left=top_left, bottom_right=bottom_right)
-                break
 
     def draw(self, image):
         """
@@ -199,9 +210,9 @@ class TrafficLight:
         all_count = red_count + orange_count + green_count
 
         if all_count < 10:  # 30
-            return 0, 0, 0
+            return 0, 0, 0, 0
         else:
-            return red_count/all_count, orange_count/all_count, green_count/all_count
+            return all_count, red_count/all_count, orange_count/all_count, green_count/all_count
 
     def draw_contours(self, image):
         """
@@ -213,8 +224,8 @@ class TrafficLight:
         cv2.rectangle(img=image,
                       pt1=self._top_left,
                       pt2=self._bottom_right,
-                      thickness=params.DEFAULT_THICKNESS,
-                      color=params.COLOR_YELLOW)
+                      thickness=constants.DEFAULT_THICKNESS,
+                      color=constants.COLOR_YELLOW)
 
     def serialize(self):
         """

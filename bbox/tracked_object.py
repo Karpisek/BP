@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import params
+import constants
 
 from bbox.size import ObjectSize
 from bbox.coordinates import Coordinates
@@ -83,6 +83,10 @@ class TrackedObjectsRepository:
 
         return self._lifelines
 
+    @property
+    def flows(self):
+        return [tracked_object.flow for tracked_object in self._tracked_objects]
+
     def new_tracked_object(self, coordinates, size, confident_score, _):
         """
         Creates new tracked object. If it found collision with existing tracked object these objects are marget
@@ -102,7 +106,7 @@ class TrackedObjectsRepository:
 
         collision = False
         for index, tracked_object in enumerate(self._tracked_objects[:]):
-            if tracked_object.overlap(new_object) > params.TRACKER_MAX_OVERLAP:
+            if tracked_object.overlap(new_object) > constants.TRACKER_MAX_OVERLAP:
                 new_object.id = tracked_object.id
                 self._tracked_objects[index] = new_object
                 collision = True
@@ -134,7 +138,7 @@ class TrackedObjectsRepository:
             global_mask = np.maximum(global_mask, tracked_object.mask(width=width,
                                                                       height=height,
                                                                       area_size=area_size,
-                                                                      color=params.COLOR_WHITE_MONO))
+                                                                      color=constants.COLOR_WHITE_MONO))
 
         return global_mask
 
@@ -163,7 +167,8 @@ class TrackedObjectsRepository:
                     tracked_object.update_history()
 
             if tracked_object.tracker_point not in self._info.corridors_repository:
-                self._tracked_objects.remove(tracked_object)
+                if tracked_object.center not in self._info.corridors_repository:
+                    self._tracked_objects.remove(tracked_object)
 
             elif tracked_object.tracker_point not in self._info.update_area:
                 self._tracked_objects.remove(tracked_object)
@@ -199,6 +204,14 @@ class TrackedObject:
     """
 
     @staticmethod
+    def draw_flow(image, flows):
+        for flow in flows:
+            center, x, y = flow
+            cv2.arrowedLine(image, center, (center[0] + int(x), center[1] + int(y)), color=constants.COLOR_RED, thickness=2, tipLength=0.2)
+
+        return image
+
+    @staticmethod
     def filter_lifelines(lifelines, vp1):
         """
         Filters given trajectories by those which have direction ti the first vanishing point.
@@ -218,7 +231,7 @@ class TrackedObject:
             except SamePointError:
                 continue
 
-            if params.TRACKER_TRAJECTORY_MIN_ANGLE < lifeline_line.angle(line_to_vp) < params.TRACKER_TRAJECTORY_MAX_ANGLE:
+            if constants.TRACKER_TRAJECTORY_MIN_ANGLE < lifeline_line.angle(line_to_vp) < constants.TRACKER_TRAJECTORY_MAX_ANGLE:
                 continue
 
             elif lifeline[0][1] < lifeline[-1][1]:
@@ -244,7 +257,7 @@ class TrackedObject:
         self._info = info
         self._kalman = cv2.KalmanFilter(4, 4)
 
-        self.lifetime = params.TRACKER_LIFELINE
+        self.lifetime = constants.TRACKER_LIFETIME
 
         self._kalman.transitionMatrix = KALMAN_TRANSITION_MATRIX
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
@@ -260,6 +273,7 @@ class TrackedObject:
         ])
 
         self._history = [self.center.tuple()]
+        self._flow = None
 
     @property
     def flow(self):
@@ -267,7 +281,7 @@ class TrackedObject:
         :return: pixel flow of tracked object from last mesurement
         """
 
-        return self._kalman.statePost[2][0], self._kalman.statePost[3][0]
+        return self.center.tuple(), self._kalman.statePost[2][0], self._kalman.statePost[3][0]
 
     @property
     def history(self):
@@ -390,7 +404,7 @@ class TrackedObject:
         If so it saves current position to history.
         """
 
-        if np.abs(self.center.y - self._history[-1][1]) > params.TRACKER_HISTORY_DIFFERENCE:
+        if np.abs(self.center.y - self._history[-1][1]) > constants.TRACKER_HISTORY_DIFFERENCE:
             self._history.append(self.center.tuple())
 
     def overlap(self, overlapping_object):
@@ -437,7 +451,7 @@ class TrackedObject:
         """
 
         if area_size == "inner":
-            return self.radius if self.radius < 30 else 30
+            return self.radius if self.radius < 10 else 10
 
         if area_size == "outer":
             return self.radius
@@ -482,23 +496,25 @@ class TrackedObject:
         :param size: measured object size
         :param score: measured object score
         :param new_coordinates: coordinates of measured object
+        :param mode: current mode
         :return:
         """
 
-        mesurement = np.array([
-            [np.float32(new_coordinates.x)],
-            [np.float32(new_coordinates.y)],
-            [np.float32(0)],
-            [np.float32(0)]
-        ])
+        if not self._info.corridors_repository.behind_line(new_coordinates):
+            mesurement = np.array([
+                [np.float32(new_coordinates.x)],
+                [np.float32(new_coordinates.y)],
+                [np.float32(0)],
+                [np.float32(0)]
+            ])
 
-        self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
-        self._kalman.correct(mesurement)
+            self._kalman.measurementMatrix = KALMAN_MESUREMENT_POSITION_MATRIX
+            self._kalman.correct(mesurement)
 
-        self.score = score
+            self.score = score
 
-        self._reference_object_size = size
-        self._reference_coordinates = new_coordinates
+            self._reference_object_size = size
+            self._reference_coordinates = new_coordinates
 
     def update_flow(self, old_positions, new_positions) -> None:
         """
@@ -515,13 +531,14 @@ class TrackedObject:
         mesurement = np.array([
             [np.float32(0)],
             [np.float32(0)],
-            [np.float32(x_flow/params.TRACKER_OPTICAL_FLOW_FREQUENCY)],
-            [np.float32(y_flow/params.TRACKER_OPTICAL_FLOW_FREQUENCY)]
+            [np.float32(x_flow / constants.TRACKER_OPTICAL_FLOW_FREQUENCY)],
+            [np.float32(y_flow / constants.TRACKER_OPTICAL_FLOW_FREQUENCY)]
         ])
 
         self._velocity = np.sqrt(x_flow ** 2 + y_flow ** 2)
         self._kalman.measurementMatrix = KALMAN_MESUREMENT_FLOW_MATRIX
         self._kalman.correct(mesurement)
+        self._flow = x_flow, y_flow
 
     def in_area(self, new_coordinates):
         """
@@ -578,7 +595,7 @@ class TrackedObject:
         else:
             return 0, 0
 
-    def mask(self, width, height, area_size="inner", color=params.COLOR_WHITE_MONO) -> np.ndarray:
+    def mask(self, width, height, area_size="inner", color=constants.COLOR_WHITE_MONO) -> np.ndarray:
         """
         Creates (binary) mask of circle area around this tracked object in scene
 
@@ -594,7 +611,7 @@ class TrackedObject:
                    center=self.center.tuple(),
                    radius=self.area(area_size),
                    color=color,
-                   thickness=params.FILL)
+                   thickness=constants.FILL)
 
         return mask
 

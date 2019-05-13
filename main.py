@@ -1,3 +1,11 @@
+"""
+The main thread used for initialization of proposed system
+"""
+
+__author__ = "Miroslav Karpisek"
+__email__ = "xkarpi05@stud.fit.vutbr.cz"
+__date__ = "14.5.2019"
+
 import sys
 
 from pipeline.parser import InputParser
@@ -7,7 +15,7 @@ from video_stream import FrameLoader, Info, VideoPlayer
 from pipeline import Tracker, Calibrator
 from detectors import Detector
 
-import params
+import constants
 from video_stream.video_writer import ViolationWriter
 
 PATH_TO_CAR_MODEL = 'detectors/models/car_detectors/ssd2.pb'
@@ -16,11 +24,10 @@ PATH_TO_LIGHTS_MODEL = 'detectors/models/traffic_light_detectors/rcnn_coco_model
 
 def main(argv):
     """
-    Creates instances of pipeblocks used in this project.
+    Creates instances of PipeBlocks used in this project.
     Starts each instance and waits until VideoWriter instance finishes his work.
 
     :param argv: program arguments
-    :return: None
     """
 
     program_arguments = InputParser(argv=argv)
@@ -51,13 +58,13 @@ def main(argv):
 
     # car tracker
     tracker = Tracker(info=video_info,
-                      output=[observer, calibrator])
+                      output=[observer, calibrator, video_player])
 
     # car detector
     car_detector = Detector(model=PATH_TO_CAR_MODEL,
                             info=video_info,
                             output=[tracker],
-                            detector_type_id=params.DETECTOR_CAR_ID)
+                            detector_type_id=constants.DETECTOR_CAR_ID)
     # frame loader
     frame_loader = FrameLoader(info=video_info,
                                output=[car_detector,

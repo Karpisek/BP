@@ -1,5 +1,5 @@
 import cv2
-import params
+import constants
 import numpy as np
 
 from copy import deepcopy
@@ -178,36 +178,36 @@ class Box2D:
         """
 
         if self._behaviour == CarBehaviourMode.RED_DRIVER:
-            color = params.COLOR_RED
+            color = constants.COLOR_RED
         elif self._behaviour == CarBehaviourMode.ORANGE_DRIVER:
-            color = params.COLOR_ORANGE
+            color = constants.COLOR_ORANGE
         else:
-            color = params.COLOR_GREEN
+            color = constants.COLOR_GREEN
 
         cv2.rectangle(img=image,
                       pt1=self._top_left,
                       pt2=self._bottom_right,
                       color=color,
-                      thickness=params.OBSERVER_BOX_THICKNESS)
+                      thickness=constants.OBSERVER_BOX_THICKNESS)
 
         cv2.rectangle(img=image,
                       pt1=self._top_left,
                       pt2=(self._top_left[0] + 30, self._top_left[1] - 15),
                       color=color,
-                      thickness=params.FILL)
+                      thickness=constants.FILL)
 
         cv2.circle(img=image,
                    center=self.tracker_point.tuple(),
-                   color=params.COLOR_RED,
+                   color=constants.COLOR_RED,
                    radius=5,
-                   thickness=params.FILL)
+                   thickness=constants.FILL)
 
         cv2.putText(img=image,
                     text=self.car_id,
                     org=self._top_left,
                     fontFace=1,
                     fontScale=1,
-                    color=params.COLOR_BLACK,
+                    color=constants.COLOR_BLACK,
                     thickness=2)
 
         return image
@@ -225,15 +225,15 @@ class Box2D:
             for index, point in enumerate(self._history):
                 cv2.circle(img=image,
                            center=point.tuple(),
-                           color=params.COLOR_BLUE,
+                           color=constants.COLOR_BLUE,
                            radius=5,
-                           thickness=params.FILL)
+                           thickness=constants.FILL)
 
                 try:
                     cv2.line(img=image,
                              pt1=point.tuple(),
                              pt2=self._history[index + 1].tuple(),
-                             color=params.COLOR_BLUE,
+                             color=constants.COLOR_BLUE,
                              thickness=2)
 
                 except IndexError:
@@ -241,33 +241,33 @@ class Box2D:
 
         if method == "first":
             try:
-                Line(self._history[0].tuple(), self._history[-1].tuple()).draw(image, params.COLOR_RED, 1)
+                Line(self._history[0].tuple(), self._history[-1].tuple()).draw(image, constants.COLOR_RED, 1)
             except SamePointError:
                 return
 
             cv2.circle(img=image,
                        center=self._history[0].tuple(),
-                       color=params.COLOR_BLUE,
+                       color=constants.COLOR_BLUE,
                        radius=5,
-                       thickness=params.FILL)
+                       thickness=constants.FILL)
 
             cv2.circle(img=image,
                        center=self._history[-1].tuple(),
-                       color=params.COLOR_BLUE,
+                       color=constants.COLOR_BLUE,
                        radius=5,
-                       thickness=params.FILL)
+                       thickness=constants.FILL)
 
             cv2.line(img=image,
                      pt1=self._history[0].tuple(),
                      pt2=self._history[-1].tuple(),
-                     color=params.COLOR_BLUE,
+                     color=constants.COLOR_BLUE,
                      thickness=2)
 
         position_history = [coordinates.tuple() for coordinates in self._history]
         line, value = ransac(position_history, position_history, 1)
 
         if line is not None and value > 5:
-            line.draw(image, params.COLOR_RED, 2)
+            line.draw(image, constants.COLOR_RED, 2)
 
     def __str__(self):
         return f"[Box id: {self._car_id}]"
@@ -441,14 +441,14 @@ class BBoxRepository:
 
         statistics_panel = np.full(shape=(30, info.width, 3),
                                    dtype=np.uint8,
-                                   fill_value=params.COLOR_WHITE)
+                                   fill_value=constants.COLOR_WHITE)
 
         cv2.putText(img=statistics_panel,
                     text=f"Total car count: {self.car_count}",
                     org=(10, 20),
                     fontFace=1,
                     fontScale=1,
-                    color=params.COLOR_BLACK,
+                    color=constants.COLOR_BLACK,
                     thickness=1)
 
         cv2.putText(img=statistics_panel,
@@ -456,7 +456,7 @@ class BBoxRepository:
                     org=(300, 20),
                     fontFace=1,
                     fontScale=1,
-                    color=params.COLOR_BLACK,
+                    color=constants.COLOR_BLACK,
                     thickness=1)
 
         cv2.putText(img=statistics_panel,
@@ -464,7 +464,7 @@ class BBoxRepository:
                     org=(500, 20),
                     fontFace=1,
                     fontScale=1,
-                    color=params.COLOR_BLACK,
+                    color=constants.COLOR_BLACK,
                     thickness=1)
 
         return np.concatenate((statistics_panel, image), axis=0)
@@ -505,7 +505,7 @@ class Observer(ThreadedPipeBlock):
     states.
     """
 
-    def __init__(self, info, output, pipe_id=params.OBSERVER_ID):
+    def __init__(self, info, output, pipe_id=constants.OBSERVER_ID):
         """
         :param info: instance of InputInfo
         :param output: list of output instances of PipeBlock
@@ -543,8 +543,8 @@ class Observer(ThreadedPipeBlock):
         :param seq: current sequnece number
         """
 
-        tracker_seq, tracked_objects = self.receive(pipe_id=params.TRACKER_ID)
-        lights_seq, current_lights_state = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+        tracker_seq, tracked_objects = self.receive(pipe_id=constants.TRACKER_ID)
+        lights_seq, current_lights_state = self.receive(pipe_id=constants.TRAFFIC_LIGHT_OBSERVER_ID)
 
         for tracked_object in tracked_objects:
             anchors, _, car_info, car_velocity = tracked_object
@@ -563,12 +563,12 @@ class Observer(ThreadedPipeBlock):
                     except IndexError:
                         continue
 
-        if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
+        if is_frequency(seq, constants.VIDEO_PLAYER_FREQUENCY):
             message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID, block=False)
+            self.send(message, pipe_id=constants.VIDEO_PLAYER_ID, block=False)
 
-        if is_frequency(seq, params.VIOLATION_WRITER_FREQUENCY):
+        if is_frequency(seq, constants.VIOLATION_WRITER_FREQUENCY):
             message = seq, deepcopy(self._bounding_boxes_repository), current_lights_state
-            self.send(message, pipe_id=params.VIOLATION_WRITER_ID)
+            self.send(message, pipe_id=constants.VIOLATION_WRITER_ID)
 
         self._previous_lights_state = current_lights_state

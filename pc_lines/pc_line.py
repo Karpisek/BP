@@ -1,5 +1,5 @@
 from .line import Line, NoIntersectionError, SamePointError, ransac, NotOnLineError
-import params
+import constants
 
 from matplotlib import pyplot
 
@@ -90,7 +90,7 @@ class PcLines:
 
         line, ratio = ransac(creator_points=self.s_points,
                              voting_points=self.s_points,
-                             ransac_threshold=params.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta,
+                             ransac_threshold=constants.CALIBRATOR_RANSAC_THRESHOLD_RATIO * self.delta,
                              write=write)
 
         # print(line)

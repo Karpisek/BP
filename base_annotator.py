@@ -2,7 +2,7 @@ import getopt
 import json
 import sys
 
-import params
+import constants
 from pipeline.parser import ParametersError
 from video_stream.input_info import VideoInfo
 
@@ -37,7 +37,7 @@ class BaseAnnotator:
         self.directory_output = f"{self.annotation_output_dir}/{self.video_info.filename}"
 
         try:
-            with open(self.directory_output + "/" + params.ANNOTATIONS_FILENAME, "r") as file:
+            with open(self.directory_output + "/" + constants.ANNOTATIONS_FILENAME, "r") as file:
                 self.annotations = json.load(file)
         except FileNotFoundError:
             self.clear_annotations()
@@ -79,7 +79,7 @@ class BaseAnnotator:
         raise NotImplementedError
 
     def _after(self):
-        with open(self.directory_output + "/" + params.ANNOTATIONS_FILENAME, "w") as file:
+        with open(self.directory_output + "/" + constants.ANNOTATIONS_FILENAME, "w") as file:
             json.dump(self.annotations, file)
 
     def clear_annotations(self):
