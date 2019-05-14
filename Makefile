@@ -1,4 +1,3 @@
-BASH:=/bin/bash
 PYTHON=project_venv/bin/python3
 
 prepare:
