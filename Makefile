@@ -1,3 +1,4 @@
+BASH:=/bin/bash
 PYTHON=project_venv/bin/python3
 
 prepare:
@@ -8,8 +9,8 @@ prepare:
 	project_venv/bin/pip install -Ur requirements.txt; \
 
 run:
-	source project_venv/bin/activate
-	${PYTHON} detect_violations.py --input=${INPUT} --output=${OUTPUT} -${PARAMS}
+	source project_venv/bin/activate; \
+	${PYTHON} detect_violations.py --input=${INPUT} --output=${OUTPUT} -${PARAMS}; \
 
 install:
 	source ./project_venv/bin/activate; \
