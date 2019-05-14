@@ -8,7 +8,7 @@ prepare:
 	project_venv/bin/pip install -Ur requirements.txt; \
 
 run:
-	. project_venv/bin/activate
+	source project_venv/bin/activate
 	${PYTHON} detect_violations.py --input=${INPUT} --output=${OUTPUT} -${PARAMS}
 
 install:
