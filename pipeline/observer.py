@@ -1,13 +1,14 @@
 import cv2
-import constants
+from primitives import constants
 import numpy as np
 
 from copy import deepcopy
 from enum import IntEnum
-from detectors import Coordinates
-from pc_lines.line import ransac, Line, SamePointError
-from pipeline import ThreadedPipeBlock, is_frequency
-from pipeline.base.pipeline import Mode
+
+from primitives.coordinates import Coordinates
+from primitives.enums import Mode
+from primitives.line import ransac, Line, SamePointError
+from pipeline.base.pipeline import is_frequency, ThreadedPipeBlock
 from pipeline.traffic_light_observer import Color
 
 

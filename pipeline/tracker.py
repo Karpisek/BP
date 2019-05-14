@@ -1,11 +1,10 @@
-import constants
+from primitives import constants
 
 from copy import deepcopy
-from bbox import TrackedObjectsRepository
-from bbox.optical_flow import OpticalFlow
-from pipeline import ThreadedPipeBlock
+from primitives.optical_flow import OpticalFlow
 from munkres import Munkres
-from pipeline.base.pipeline import is_frequency
+from pipeline.base.pipeline import is_frequency, ThreadedPipeBlock
+from repositories.tracked_object_repository import TrackedObjectsRepository
 
 
 def transpose_matrix(matrix):
@@ -136,7 +135,7 @@ class Tracker(ThreadedPipeBlock):
             for detected_object in detected_objects:
                 coordinates, size, confident_score, class_id = detected_object
 
-                if coordinates in self._info.start_area:
+                if coordinates in self._info.update_area:
                     self._tracked_object_repository.new_tracked_object(*detected_object)
 
     def _update_from_predictor(self, sequence_number) -> None:
@@ -205,7 +204,7 @@ class Tracker(ThreadedPipeBlock):
             if new_box[2] > constants.TRACKER_MINIMAL_SCORE:
                 coordinates, size, confident_score, _ = new_box
 
-                if coordinates in self._info.start_area:
+                if coordinates in self._info.update_area:
                     self._tracked_object_repository.new_tracked_object(*new_box)
 
 

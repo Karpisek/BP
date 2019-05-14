@@ -1,6 +1,9 @@
 """
 InputInfo class definition
 """
+from primitives.area import Area
+from primitives.coordinates import Coordinates
+from primitives.enums import CalibrationMode, Color
 from video_stream.video_info import VideoInfo
 
 __author__ = "Miroslav Karpisek"
@@ -9,26 +12,10 @@ __date__ = "14.5.2019"
 
 import cv2
 import numpy as np
-import constants
+from primitives import constants
 
-from enum import Enum
-from bbox import Area, Coordinates
 from repositories.traffic_corridor_repository import TrafficCorridorRepository
 from repositories.traffic_light_repository import TrafficLightsRepository
-from pipeline.traffic_light_observer import Color
-
-
-class CalibrationMode(Enum):
-    """
-    Represents calibration mode. If it was done by user or auto.
-    """
-    AUTOMATIC = 0
-    LIGHTS_MANUAL = 1
-    CORRIDORS_MANUAL = 2
-    MANUAL = 3
-
-    def __str__(self):
-        return self.name.lower()
 
 
 class Info(VideoInfo):
@@ -56,7 +43,7 @@ class Info(VideoInfo):
         self._calibration_mode = CalibrationMode.AUTOMATIC
 
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height / 2),
+                                        top_left=Coordinates(0, self.height / 3),
                                         top_right=Coordinates(self.width, self.height / 2),
                                         bottom_right=Coordinates(self.width, self.height),
                                         bottom_left=Coordinates(0, self.height))

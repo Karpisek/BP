@@ -1,9 +1,8 @@
 import numpy as np
 
-import constants
-from pipeline import ThreadedPipeBlock, is_frequency
-from pipeline.base.pipeline import Mode
-from repositories.traffic_light_repository import Color
+from primitives import constants
+from primitives.enums import Color, Mode
+from pipeline.base.pipeline import ThreadedPipeBlock, is_frequency
 
 
 class TrafficLightsObserver(ThreadedPipeBlock):

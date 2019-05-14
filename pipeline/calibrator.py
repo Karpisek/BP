@@ -1,15 +1,14 @@
 import cv2
 import numpy as np
-import constants
+from primitives import constants
 
-from bbox.coordinates import Coordinates
-from bbox.tracked_object import TrackedObject
-from pc_lines.line import Line, SamePointError, ransac
-from pc_lines.pc_line import PcLines
-from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
-from pipeline import ThreadedPipeBlock
-from pipeline.base.pipeline import Mode
-from repositories.traffic_light_repository import Color
+from primitives.coordinates import Coordinates
+from repositories.models.tracked_object import TrackedObject
+from primitives.enums import Color, Mode
+from primitives.line import Line, SamePointError, ransac
+from primitives.pc_space import ParallelCoordinateSpace
+from primitives.vanishing_point import VanishingPoint, VanishingPointError
+from pipeline.base.pipeline import ThreadedPipeBlock
 
 
 class SyncError(Exception):
@@ -30,7 +29,7 @@ class Calibrator(ThreadedPipeBlock):
         """
         super().__init__(info=info, pipe_id=constants.CALIBRATOR_ID, output=output)
 
-        self._pc_lines = PcLines(info.width)
+        self._pc_lines = ParallelCoordinateSpace(info.width)
         self._detected_lines = []
 
     def _mode_changed(self, new_mode):
@@ -150,11 +149,11 @@ class Calibrator(ThreadedPipeBlock):
                         line_to_vp = Line(point2, vp1.point)
 
                     if Line(point1, point2).angle(line_to_vp) < 30 or Line(point1, point2).angle(line_to_vp) > 150:
-                        cv2.line(canny, point1, point2, constants.COLOR_RED, 1)
+                        cv2.line(canny, point1, point2, constants.COLOR_RED, 2)
                         continue
 
                     self._pc_lines.add_to_pc_space(point1, point2)
-                    cv2.line(canny, point1, point2, constants.COLOR_BLUE, 1)
+                    cv2.line(canny, point1, point2, constants.COLOR_BLUE, 2)
                 except SamePointError:
                     continue
 

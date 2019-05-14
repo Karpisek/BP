@@ -1,9 +1,8 @@
 """
-InputInfo class definition
+VideoInfo class definition
 """
 import cv2
-
-import constants
+from primitives import constants
 
 
 class VideoInfo:

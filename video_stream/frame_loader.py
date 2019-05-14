@@ -1,16 +1,16 @@
 """
 FrameLoader class definition
 """
+from primitives.enums import Mode
 
 __author__ = "Miroslav Karpisek"
 __email__ = "xkarpi05@stud.fit.vutbr.cz"
 __date__ = "14.5.2019"
 
 import numpy as np
-import constants
+from primitives import constants
 
-from pipeline import ThreadedPipeBlock
-from pipeline.base.pipeline import is_frequency, Mode
+from pipeline.base.pipeline import is_frequency, ThreadedPipeBlock
 
 
 class FrameLoader(ThreadedPipeBlock):

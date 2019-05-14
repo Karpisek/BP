@@ -1,17 +1,17 @@
 """
 VideoPlayer class definition
 """
+from repositories.models.tracked_object import TrackedObject
+from primitives.enums import Mode
 
 __author__ = "Miroslav Karpisek"
 __email__ = "xkarpi05@stud.fit.vutbr.cz"
 __date__ = "14.5.2019"
 
 import cv2
-import constants
+from primitives import constants
 
-from bbox import TrackedObject
-from pipeline import PipeBlock
-from pipeline.base.pipeline import Mode
+from pipeline.base.pipeline import PipeBlock
 
 
 class UserEndException(Exception):
