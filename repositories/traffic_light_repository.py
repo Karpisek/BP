@@ -1,19 +1,10 @@
-from enum import IntEnum
-
 import cv2
 import tensorflow as tf
 import numpy as np
 
-import params
-from bbox import Coordinates
-
-
-class Color(IntEnum):
-    ORANGE = 0
-    RED = 1
-    RED_ORANGE = 2
-    GREEN = 3
-    NONE = 4
+from primitives import constants
+from primitives.coordinates import Coordinates
+from repositories.models.traffic_light import TrafficLight
 
 
 class TrafficLightsRepository:
@@ -76,7 +67,19 @@ class TrafficLightsRepository:
         :return: detected traffic light state
         """
 
-        return self._traffic_lights[0].state_counts(current_frame, previous_frame)
+        best_value = 0
+        best_state = None
+
+        for light in self._traffic_lights:
+            value, red, orange, green = light.state_counts(current_frame, previous_frame)
+
+            if value > best_value:
+                best_state = red, orange, green
+
+        if best_state is None:
+            return 0, 0, 0
+        else:
+            return best_state
 
     def select_manually(self, image):
         """
@@ -123,17 +126,16 @@ class TrafficLightsRepository:
 
         for box, score, class_id in list(zip(boxes[0], scores[0], classes[0])):
 
-            if score < 0.5:
+            if score < constants.DETECTOR_LIGHT_MINIMAL_SCORE:
                 break
 
-            if class_id == 10:
+            if class_id == constants.TRAFFIC_LIGHT_CLASS_ID:
                 y_min, x_min, y_max, x_max = box
 
                 top_left = Coordinates(x_min, y_min, info=self._info)
                 bottom_right = Coordinates(x_max, y_max, info=self._info)
 
                 self.add_traffic_light(top_left=top_left, bottom_right=bottom_right)
-                break
 
     def draw(self, image):
         """
@@ -149,79 +151,3 @@ class TrafficLightsRepository:
 
     def serialize(self):
         return {"traffic light": self._traffic_lights[0].serialize()}
-
-
-class TrafficLight:
-    """
-    Represents detected traffic light. Allows to detect current state of this light.
-    """
-
-    def __init__(self, top_left, bottom_right):
-        """
-        :param top_left: top left anchor of detected traffic light
-        :param bottom_right: bottom right anchor of detected traffic light
-        """
-        self._top_left = top_left.tuple()
-        self._bottom_right = bottom_right.tuple()
-
-    def state_counts(self, current_frame, previous_frame):
-        """
-        Returns relative counts of colors in every part of specified color spectre.
-        Uses HSV color model for filtering colors.
-        For error correction uses combination of current and previous frame
-
-        :param current_frame: current fram
-        :param previous_frame: previous frame
-        :return:
-        """
-
-        current_light = current_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
-        previous_light = previous_frame[self._top_left[1]: self._bottom_right[1], self._top_left[0]: self._bottom_right[0]]
-
-        smoothed_current_light = cv2.blur(current_light, (3, 3))
-        smoothed_previous_light = cv2.blur(previous_light, (3, 3))
-
-        combined_image = cv2.max(smoothed_current_light, smoothed_previous_light)
-
-        hsv_image = cv2.cvtColor(combined_image, cv2.COLOR_BGR2HSV)
-
-        low_red_mask = cv2.inRange(hsv_image, (0, 100, 10), (5, 255, 255))
-        up_red_mask = cv2.inRange(hsv_image, (160, 100, 10), (180, 255, 255))
-        orange_mask = cv2.inRange(hsv_image, (5, 100, 10), (25, 255, 255))
-        green_mask = cv2.inRange(hsv_image, (30, 100, 10), (95, 255, 255))
-
-        red_mask = np.maximum(low_red_mask, up_red_mask)
-
-        red_count = cv2.countNonZero(red_mask)
-        orange_count = cv2.countNonZero(orange_mask)
-        green_count = cv2.countNonZero(green_mask)
-
-        all_count = red_count + orange_count + green_count
-
-        if all_count < 10:  # 30
-            return 0, 0, 0
-        else:
-            return red_count/all_count, orange_count/all_count, green_count/all_count
-
-    def draw_contours(self, image):
-        """
-        Helper function for contoure drawing of detected traffic light
-
-        :param image: selected image to draw on
-        """
-
-        cv2.rectangle(img=image,
-                      pt1=self._top_left,
-                      pt2=self._bottom_right,
-                      thickness=params.DEFAULT_THICKNESS,
-                      color=params.COLOR_YELLOW)
-
-    def serialize(self):
-        """
-        :return: serialized traffic light
-        """
-
-        return {"top left": list(self._top_left), "bottom right": list(self._bottom_right)}
-
-
-

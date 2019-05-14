@@ -1,4 +1,4 @@
-munkres
-cv2
-tensorflow
-numpy
+munkres==1.1.2
+numpy==1.16.2
+opencv-python==4.1.0.25
+tensorflow==1.13.0rc2

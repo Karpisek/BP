@@ -1,15 +1,14 @@
 import cv2
 import numpy as np
-import params
+from primitives import constants
 
-from bbox.coordinates import Coordinates
-from bbox.tracked_object import TrackedObject
-from pc_lines.line import Line, SamePointError, ransac
-from pc_lines.pc_line import PcLines
-from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
-from pipeline import ThreadedPipeBlock
-from pipeline.base.pipeline import Mode
-from repositories.traffic_light_repository import Color
+from primitives.coordinates import Coordinates
+from repositories.models.tracked_object import TrackedObject
+from primitives.enums import Color, Mode
+from primitives.line import Line, SamePointError, ransac
+from primitives.pc_space import ParallelCoordinateSpace
+from primitives.vanishing_point import VanishingPoint, VanishingPointError
+from pipeline.base.pipeline import ThreadedPipeBlock
 
 
 class SyncError(Exception):
@@ -28,9 +27,9 @@ class Calibrator(ThreadedPipeBlock):
         :param info: instance of InputInfo containing all information about examined video. Holds information
         about founded vanishing point.
         """
-        super().__init__(info=info, pipe_id=params.CALIBRATOR_ID, output=output)
+        super().__init__(info=info, pipe_id=constants.CALIBRATOR_ID, output=output)
 
-        self._pc_lines = PcLines(info.width)
+        self._pc_lines = ParallelCoordinateSpace(info.width)
         self._detected_lines = []
 
     def _mode_changed(self, new_mode):
@@ -54,9 +53,9 @@ class Calibrator(ThreadedPipeBlock):
         :param seq: current sequnce number
         """
 
-        seq_loader, new_frame = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        seq_lights, light_status = self.receive(pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
-        seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=params.TRACKER_ID)
+        seq_loader, new_frame = self.receive(pipe_id=constants.FRAME_LOADER_ID)
+        seq_lights, light_status = self.receive(pipe_id=constants.TRAFFIC_LIGHT_OBSERVER_ID)
+        seq_tracker, boxes_mask, boxes_mask_no_border, lifelines = self.receive(pipe_id=constants.TRACKER_ID)
 
         if not self._info.corridors_repository.corridors_found:
             if len(self._info.vanishing_points) < 1:
@@ -65,7 +64,7 @@ class Calibrator(ThreadedPipeBlock):
             elif len(self._info.vanishing_points) < 2:
                 self._detect_second_vanishing_point(new_frame, boxes_mask, boxes_mask_no_border, light_status)
 
-            elif len(TrackedObject.filter_lifelines(lifelines, self._info.vp1)) > params.CORRIDORS_MINIMUM_LIFELINES:
+            elif len(TrackedObject.filter_lifelines(lifelines, self._info.vp1)) > constants.CORRIDORS_MINIMUM_LIFELINES:
                 self._find_corridors(lifelines)
 
     def _detect_first_vp(self, lifelines):
@@ -80,7 +79,7 @@ class Calibrator(ThreadedPipeBlock):
         :param lifelines: movement of cars
         """
 
-        if len(lifelines) > params.CALIBRATOR_VP1_TRACK_MINIMUM:
+        if len(lifelines) > constants.CALIBRATOR_VP1_TRACK_MINIMUM:
 
             for history in lifelines:
                 line, value = ransac(history, history, 1)
@@ -94,7 +93,7 @@ class Calibrator(ThreadedPipeBlock):
             #     except IndexError:
             #         pass
 
-            if self._pc_lines.count > params.CALIBRATOR_VP1_TRACK_MINIMUM:
+            if self._pc_lines.count > constants.CALIBRATOR_VP1_TRACK_MINIMUM:
                 new_vanishing_point = self._pc_lines.find_most_lines_cross(write=True)
                 self._info.vanishing_points.append(VanishingPoint(point=new_vanishing_point))
 
@@ -130,9 +129,9 @@ class Calibrator(ThreadedPipeBlock):
         lines = cv2.HoughLinesP(image=no_border_canny,
                                 rho=1,
                                 theta=np.pi / 350,
-                                threshold=params.CALIBRATOR_HLP_THRESHOLD,
-                                minLineLength=params.CALIBRATOR_MIN_LINE_LENGTH,
-                                maxLineGap=params.CALIBRATOR_MAX_LINE_GAP)
+                                threshold=constants.CALIBRATOR_HLP_THRESHOLD,
+                                minLineLength=constants.CALIBRATOR_MIN_LINE_LENGTH,
+                                maxLineGap=constants.CALIBRATOR_MAX_LINE_GAP)
 
         vp1 = self._info.vanishing_points[0]
 
@@ -150,17 +149,17 @@ class Calibrator(ThreadedPipeBlock):
                         line_to_vp = Line(point2, vp1.point)
 
                     if Line(point1, point2).angle(line_to_vp) < 30 or Line(point1, point2).angle(line_to_vp) > 150:
-                        cv2.line(canny, point1, point2, params.COLOR_RED, 1)
+                        cv2.line(canny, point1, point2, constants.COLOR_RED, 2)
                         continue
 
                     self._pc_lines.add_to_pc_space(point1, point2)
-                    cv2.line(canny, point1, point2, params.COLOR_BLUE, 1)
+                    cv2.line(canny, point1, point2, constants.COLOR_BLUE, 2)
                 except SamePointError:
                     continue
 
-            cv2.imwrite("test.jpg", no_border_canny)
+            cv2.imwrite("test.jpg", canny)
 
-        if self._pc_lines.count > params.CALIBRATOR_VP2_TRACK_MINIMUM:
+        if self._pc_lines.count > constants.CALIBRATOR_VP2_TRACK_MINIMUM:
             new_vanishing_point = self._pc_lines.find_most_lines_cross()
 
             x, y = new_vanishing_point
@@ -225,7 +224,7 @@ class Calibrator(ThreadedPipeBlock):
 
             line = Line(first_point, self._info.vp1.point)
             line.draw(image=helper_mask,
-                      color=params.COLOR_LIFELINE,
+                      color=constants.COLOR_LIFELINE,
                       thickness=100)
 
             mask = cv2.add(mask, helper_mask)

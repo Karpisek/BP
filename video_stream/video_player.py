@@ -1,8 +1,17 @@
-import cv2
-import params
+"""
+VideoPlayer class definition
+"""
+from repositories.models.tracked_object import TrackedObject
+from primitives.enums import Mode
 
-from pipeline import PipeBlock
-from pipeline.base.pipeline import Mode
+__author__ = "Miroslav Karpisek"
+__email__ = "xkarpi05@stud.fit.vutbr.cz"
+__date__ = "14.5.2019"
+
+import cv2
+from primitives import constants
+
+from pipeline.base.pipeline import PipeBlock
 
 
 class UserEndException(Exception):
@@ -23,7 +32,7 @@ class VideoPlayer(PipeBlock):
         :param output: list of output PipeBlocks. Used for delegation of user interaction between PipeBlocks.
         """
 
-        super().__init__(info=info, pipe_id=params.VIDEO_PLAYER_ID, print_fps=print_fps, output=output)
+        super().__init__(info=info, pipe_id=constants.VIDEO_PLAYER_ID, print_fps=print_fps, output=output)
 
         self._detector = None
         self._loader = None
@@ -35,6 +44,8 @@ class VideoPlayer(PipeBlock):
         self._draw_lights = False
         self._draw_statistics = False
         self._draw_boxes = True
+        self._draw_area = False
+        self._draw_flow = False
 
     def _mode_changed(self, new_mode):
         super()._mode_changed(new_mode)
@@ -50,15 +61,16 @@ class VideoPlayer(PipeBlock):
         :param seq: current sequence number
         """
 
-        loader_seq, image = self.receive(pipe_id=params.FRAME_LOADER_ID)
-        observer_seq, boxes_repository, lights_state = self.receive(pipe_id=params.OBSERVER_ID)
+        loader_seq, image = self.receive(pipe_id=constants.FRAME_LOADER_ID)
+        observer_seq, boxes_repository, lights_state = self.receive(pipe_id=constants.OBSERVER_ID)
+        sequence_number, serialized_tracked_objects, tracked_object_lifelines, flows = self.receive(pipe_id=constants.TRACKER_ID)
 
-        image = self._assemble_frame(image, boxes_repository, lights_state)
+        image = self._assemble_frame(image, boxes_repository, lights_state, flows)
 
         cv2.imshow("image", image)
 
         self._parse_user_interaction(image)
-        self.send(None, params.VIOLATION_WRITER_ID)
+        self.send(None, constants.VIOLATION_WRITER_ID)
 
     def _parse_user_interaction(self, image):
         """
@@ -66,7 +78,7 @@ class VideoPlayer(PipeBlock):
         On supported Keystroke inside flags are being updated.
         """
 
-        key = cv2.waitKey(params.VIDEO_PLAYER_SPEED)
+        key = cv2.waitKey(constants.VIDEO_PLAYER_SPEED)
 
         if key & 0xFF == ord("q"):
             raise EOFError
@@ -82,6 +94,7 @@ class VideoPlayer(PipeBlock):
             self._draw_boxes = True
             self._draw_vanishing_points = False
             self._draw_statistics = True
+            self._draw_area = False
 
         # trajectories
         if key & 0xFF == ord("t"):
@@ -107,6 +120,14 @@ class VideoPlayer(PipeBlock):
         if key & 0xFF == ord("b"):
             self._draw_boxes = not self._draw_boxes
 
+        #  area
+        if key & 0xFF == ord("a"):
+            self._draw_area = not self._draw_area
+
+        #  flow
+        if key & 0xFF == ord("f"):
+            self._draw_flow = not self._draw_flow
+
     def _after(self):
         """
         Destroys all windows after computation is done.
@@ -115,9 +136,9 @@ class VideoPlayer(PipeBlock):
 
         cv2.destroyAllWindows()
         self._update_mode(Mode.SIGNAL)
-        self.send(EOFError, params.VIOLATION_WRITER_ID)
+        self.send(EOFError, constants.VIOLATION_WRITER_ID)
 
-    def _assemble_frame(self, image, boxes_repository, lights_state):
+    def _assemble_frame(self, image, boxes_repository, lights_state, flows):
         """
         Depending on inside flags draws additional information to current frame.
         inside flags can be set by user interaction.
@@ -136,7 +157,7 @@ class VideoPlayer(PipeBlock):
 
         if self._draw_lights:
             image = self._info.draw_detected_traffic_lights(image)
-            self._info.draw_syntetic_traffic_lights(image, lights_state)
+            self._info.draw_synthetic_traffic_lights(image, lights_state)
 
         if self._draw_corridors:
             image = self._info.draw_corridors(image)
@@ -146,5 +167,11 @@ class VideoPlayer(PipeBlock):
 
         if self._draw_vanishing_points:
             image = self._info.draw_vanishing_points(image)
+
+        if self._draw_area:
+            image = self._info.update_area.draw(image)
+
+        if self._draw_flow:
+            image = TrackedObject.draw_flow(image, flows)
 
         return image

@@ -1,8 +1,16 @@
-import numpy as np
-import params
+"""
+FrameLoader class definition
+"""
+from primitives.enums import Mode
 
-from pipeline import ThreadedPipeBlock
-from pipeline.base.pipeline import is_frequency, Mode
+__author__ = "Miroslav Karpisek"
+__email__ = "xkarpi05@stud.fit.vutbr.cz"
+__date__ = "14.5.2019"
+
+import numpy as np
+from primitives import constants
+
+from pipeline.base.pipeline import is_frequency, ThreadedPipeBlock
 
 
 class FrameLoader(ThreadedPipeBlock):
@@ -17,7 +25,7 @@ class FrameLoader(ThreadedPipeBlock):
         :param output: list of PipeBlock instances used for current frame delegation
         :param info: instance of informations about the current video
         """
-        super().__init__(info=info, pipe_id=params.FRAME_LOADER_ID, output=output)
+        super().__init__(info=info, pipe_id=constants.FRAME_LOADER_ID, output=output)
 
     def _before(self):
         """
@@ -31,7 +39,7 @@ class FrameLoader(ThreadedPipeBlock):
             for _ in range(200):
                 self._info.read()
 
-            image = self._info.read(params.DETECTOR_IMAGE_WIDTH)
+            image = self._info.read(constants.DETECTOR_IMAGE_WIDTH)
 
             self._info.traffic_lights_repository.find(image=image)
             self._info.reopen()
@@ -65,33 +73,33 @@ class FrameLoader(ThreadedPipeBlock):
 
         image = self._info.read()
 
-        if is_frequency(seq, params.VIDEO_PLAYER_FREQUENCY):
+        if is_frequency(seq, constants.VIDEO_PLAYER_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.VIDEO_PLAYER_ID)
+            self.send(message, pipe_id=constants.VIDEO_PLAYER_ID)
 
-        if is_frequency(seq, params.TRAFFIC_LIGHT_OBSERVER_FREQUENCY):
+        if is_frequency(seq, constants.TRAFFIC_LIGHT_OBSERVER_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.TRAFFIC_LIGHT_OBSERVER_ID)
+            self.send(message, pipe_id=constants.TRAFFIC_LIGHT_OBSERVER_ID)
 
-        if is_frequency(seq, params.CALIBRATOR_FREQUENCY):
+        if is_frequency(seq, constants.CALIBRATOR_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.CALIBRATOR_ID, block=False)
+            self.send(message, pipe_id=constants.CALIBRATOR_ID, block=False)
 
-        if is_frequency(seq, params.TRACKER_OPTICAL_FLOW_FREQUENCY):
+        if is_frequency(seq, constants.TRACKER_OPTICAL_FLOW_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.TRACKER_ID)
+            self.send(message, pipe_id=constants.TRACKER_ID)
 
-        if is_frequency(seq, params.DETECTOR_CAR_FREQUENCY):
+        if is_frequency(seq, constants.DETECTOR_CAR_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.DETECTOR_CAR_ID)
+            self.send(message, pipe_id=constants.DETECTOR_CAR_ID)
 
-        if is_frequency(seq, params.VIOLATION_WRITER_FREQUENCY):
+        if is_frequency(seq, constants.VIOLATION_WRITER_FREQUENCY):
             message = (seq, np.copy(image))
-            self.send(message, pipe_id=params.VIOLATION_WRITER_ID)
+            self.send(message, pipe_id=constants.VIOLATION_WRITER_ID)
 
     def _after(self):
         """
         Delegates message containing EOFError class used for signalization for the end of input video.
         """
 
-        self.send(EOFError, pipe_id=params.VIDEO_PLAYER_ID)
+        self.send(EOFError, pipe_id=constants.VIDEO_PLAYER_ID)

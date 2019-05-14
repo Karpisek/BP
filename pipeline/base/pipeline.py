@@ -1,9 +1,9 @@
 import time
-from enum import Enum
+import numpy as np
+
 from queue import Queue, Full, Empty
 from threading import Thread
-
-import numpy as np
+from primitives.enums import Mode
 
 DEFAULT_NUMBER_INPUTS = 1
 DEFAULT_QUEUE_SIZE = 20
@@ -16,18 +16,6 @@ def is_frequency(seq, divider):
     :return:
     """
     return seq % divider == 0
-
-
-class Mode(Enum):
-    """
-    PipeBlock mode
-    """
-
-    CALIBRATION_VP = 0,
-    CALIBRATION_CORRIDORS = 1,
-    DETECTION = 2,
-    SIGNAL = 3,
-    END = 4,
 
 
 class PipeBlock:

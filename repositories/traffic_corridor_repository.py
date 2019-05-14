@@ -1,24 +1,12 @@
 import cv2
 import numpy as np
-import params
+from primitives import constants
 
-from pc_lines.line import Line, SamePointError
-from pc_lines.vanishing_point import VanishingPoint, VanishingPointError
-
-
-def _mouse_callback(event, x, y, _, param):
-    """
-    Responses on mouse callback
-
-    :param param: Instance of object where click or move should be delegated
-    """
-
-    corridor_maker = param
-
-    if event == cv2.EVENT_LBUTTONDOWN:
-        corridor_maker.click(point=(x, y))
-
-    corridor_maker.move(point=(x, y))
+from primitives.line import Line, SamePointError
+from primitives.vanishing_point import VanishingPoint, VanishingPointError
+from repositories.models.corridor import TrafficCorridor
+from user_interaction.corridor_marker import CorridorMaker
+from user_interaction.stopline_marker import StopLineMaker
 
 
 class TrafficCorridorRepository:
@@ -92,11 +80,14 @@ class TrafficCorridorRepository:
         left_edge_point = self.stopline.edge_points(info=self._info)[0]
         right_edge_point = self.stopline.edge_points(info=self._info)[1]
 
-        self._stop_line = Line(point1=(left_edge_point[0], left_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET),
-                               point2=(right_edge_point[0], right_edge_point[1] - params.CORRIDORS_STOP_LINE_OFFSET))
+        self._stop_line = Line(point1=(left_edge_point[0], left_edge_point[1] - constants.CORRIDORS_STOP_LINE_OFFSET),
+                               point2=(right_edge_point[0], right_edge_point[1] - constants.CORRIDORS_STOP_LINE_OFFSET))
 
-        top_line = Line(point1=(left_edge_point[0], 2 * left_edge_point[1] / 3),
-                        point2=(right_edge_point[0], 2 * right_edge_point[1] / 3))
+        left_edge_point = self.stopline.edge_points(info=self._info)[0]
+        right_edge_point = self.stopline.edge_points(info=self._info)[1]
+
+        top_line = Line(point1=(left_edge_point[0], 3 * left_edge_point[1] / 5),
+                        point2=(right_edge_point[0], 3 * right_edge_point[1] / 5))
 
         self._info.update_area.change_area(top_line=top_line)
 
@@ -162,7 +153,7 @@ class TrafficCorridorRepository:
             return False
 
         red_line_point = self.stopline.find_coordinate(x=coordinates.x)
-        return previous_coordinates.y > red_line_point[1] > coordinates.y
+        return previous_coordinates.y >= red_line_point[1] > coordinates.y
 
     def behind_line(self, coordinates):
         """
@@ -206,14 +197,14 @@ class TrafficCorridorRepository:
             for key, corridor in self._corridors.items():
                 corridor.draw_corridor(image=image,
                                        info=self._info,
-                                       color=params.RANDOM_COLOR[key],
+                                       color=constants.RANDOM_COLOR[key],
                                        fill=fill)
 
         image = cv2.bitwise_and(image, image, mask=self._corridor_mask)
 
         if self._stopline_found:
             self.stopline.draw(image=image,
-                               color=params.COLOR_RED,
+                               color=constants.COLOR_RED,
                                thickness=5)
 
         return image
@@ -280,7 +271,7 @@ class TrafficCorridorRepository:
         edge_grey = cv2.cvtColor(frame_edge, cv2.COLOR_RGB2GRAY)
 
         edge_grey_blured = cv2.medianBlur(edge_grey, 11)
-        _, threshold = cv2.threshold(edge_grey_blured, 20, 255, cv2.THRESH_BINARY)
+        _, threshold = cv2.threshold(edge_grey_blured, 50, 255, cv2.THRESH_BINARY)
         threshold = cv2.dilate(threshold, (5, 5), iterations=5)
 
         height, width = edge_grey_blured.shape
@@ -342,7 +333,7 @@ class TrafficCorridorRepository:
 
         self._stop_places.append(coordinates)
 
-        if len(self._stop_places) >= params.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
+        if len(self._stop_places) >= constants.CORRIDORS_STOP_POINTS_MINIMAL and not self._stopline_found:
             self.find_stop_line()
 
     def find_stop_line(self):
@@ -373,7 +364,7 @@ class TrafficCorridorRepository:
                 line = Line(point1=point2.tuple(), direction=vp2.direction)
 
             num = 0
-            ransac_threshold = params.CORRIDORS_RANSAC_THRESHOLD
+            ransac_threshold = constants.CORRIDORS_RANSAC_THRESHOLD
             for point in self._stop_places:
                 distance = line.point_distance(point.tuple())
 
@@ -395,327 +386,3 @@ class TrafficCorridorRepository:
         """
 
         return {"corridors": [corridor.serialize() for _, corridor in self._corridors.items()]}
-
-
-class TrafficCorridor:
-    """
-    Representation of single traffic corridor.
-    """
-
-    def __init__(self, index, left_line, right_line, middle_point):
-        """
-        :param index: corridor id
-        :param left_line: left line of corridor
-        :param right_line: right line of corridor
-        :param middle_point: middle point to use flood fill
-        """
-
-        self._id = index
-
-        self.left_line = left_line
-        self.right_line = right_line
-        self.middle_point = middle_point
-
-    @property
-    def id(self):
-        """
-        :return: corridor id
-        """
-
-        return self._id
-
-    def draw_corridor(self, image, info, color=None, fill=True, thickness=params.DEFAULT_THICKNESS):
-        """
-        Helper function for drawing corridor
-
-        :param image: image to draw on
-        :param info: instance of InputInfo
-        :param color: selected color
-        :param fill: if flood fill should be used
-        :param thickness: thickness of line defining corridors
-        """
-
-        if color is None:
-            color = self.id
-
-        if fill:
-            mask = np.zeros(shape=(info.height, info.width),
-                            dtype=np.uint8)
-
-            self.left_line.draw(image, color, thickness)
-            self.left_line.draw(mask, color, thickness)
-
-            self.right_line.draw(image, color, thickness)
-            self.right_line.draw(mask, color, thickness)
-
-            mask_with_border = np.pad(mask, 1, 'constant', constant_values=255)
-
-            cv2.floodFill(image=image,
-                          mask=mask_with_border,
-                          seedPoint=self.middle_point,
-                          newVal=color)
-        else:
-            self.left_line.draw(image=image,
-                                color=color,
-                                thickness=5)
-
-            self.right_line.draw(image=image,
-                                 color=color,
-                                 thickness=5)
-
-    def serialize(self):
-        """
-        :return: serialized Traffic corridor in form of dictionary
-        """
-
-        return {"left_line": self.left_line.serialize(),
-                "right_line": self.right_line.serialize()}
-
-    def __str__(self):
-        return f"corridor: id [{self.id}]"
-
-
-class LineDrag:
-    """
-    Used for user interaction (dragging line)
-    """
-
-    def __init__(self, image):
-        """
-        :param image: selected image to draw on
-        """
-
-        self.selected = []
-        self.base_image = image
-
-        self.point1 = None
-        self.point2 = None
-
-    def click(self, point):
-        """
-        click response on user click
-
-        :param point: coordinates where was clicked
-        """
-
-        if self.point1 is None:
-            self.point1 = point
-
-        else:
-            self.__add_line()
-
-    def move(self, point):
-        """
-        response for mouse move
-
-        :param point: current coordinates of mouse
-        """
-
-        self.point2 = point
-
-    def __add_line(self):
-        self.add_line()
-
-        self.point1 = None
-        self.point2 = None
-
-    def draw(self, image):
-        """
-        Helper function to draw selected line on selected image.
-
-        :param image: selected image.
-        """
-
-        if self.point1 is not None:
-            cv2.line(img=image,
-                     pt1=self.point1,
-                     pt2=self.point2,
-                     color=params.COLOR_GREEN,
-                     thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
-
-    def clear(self):
-        """
-        clears selected points
-        """
-
-        self.point1 = None
-        self.point2 = None
-
-    def run(self, info) -> []:
-        raise NotImplementedError
-
-    def add_line(self):
-        raise NotImplementedError
-
-    def erase_last(self):
-        raise NotImplementedError
-
-
-class StopLineMaker(LineDrag):
-    """
-    Used for stop line creation
-    """
-
-    def __init__(self, image):
-        super().__init__(image)
-
-        self.line = None
-
-    def add_line(self):
-        """
-        Adds stop line
-        """
-
-        try:
-            self.line = Line(self.point1, self.point2)
-        except SamePointError:
-            pass
-
-    def draw(self, image):
-        """
-        Helper function to draw stop line
-
-        :param image: selected image
-        """
-
-        super().draw(image)
-
-        if self.line is not None:
-            self.line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
-
-    def run(self, info) -> []:
-        """
-        Infinite loop until user selects stop line
-
-        :param info: instance of InputInfo
-        """
-
-        cv2.namedWindow("select_stop_line")
-        cv2.setMouseCallback("select_stop_line", _mouse_callback, self)
-
-        while True:
-            image_copy = np.copy(self.base_image)
-
-            self.draw(image_copy)
-            cv2.imshow("select_stop_line", image_copy)
-
-            key = cv2.waitKey(1)
-
-            if key == 13:
-                self.line.draw(image_copy, params.COLOR_BLUE, params.CORRIDORS_LINE_SELECTOR_THICKNESS)
-                cv2.imshow("select_stop_line", image_copy)
-
-                key = cv2.waitKey(0)
-                if key == 13:
-                    cv2.destroyWindow("select_stop_line")
-                    return self.line
-
-                if key == 8:
-                    self.clear()
-
-            if key == 8:
-                self.erase_last()
-
-    def erase_last(self):
-        """
-        Deletes last selected stopline
-        """
-
-        self.line = None
-
-
-class CorridorMaker(LineDrag):
-    """
-    Used for corridor marking by user
-    """
-
-    def __init__(self, image):
-        super().__init__(image)
-        self.selected = []
-        self.base_image = image
-
-    def add_line(self):
-        """
-        Adds new line to storage
-        """
-
-        try:
-            new_line = Line(self.point1, self.point2)
-
-            if new_line.angle(Line.horizontal_line()) != 0:
-                self.selected.append(Line(self.point1, self.point2))
-
-        except SamePointError:
-            pass
-
-    def draw(self, image):
-        """
-        Helper method for drawing selected corridor lines
-
-        :param image: selected image
-        """
-
-        super().draw(image)
-
-        for line in self.selected:
-            line.draw(image, color=params.COLOR_RED, thickness=params.CORRIDORS_LINE_SELECTOR_THICKNESS)
-
-    def __iter__(self):
-        return iter(self.selected)
-
-    def clear(self):
-        """
-        Clears all selected corridor lines
-        """
-
-        self.selected = []
-        super().clear()
-
-    def erase_last(self):
-        """
-        Erases last selected corridor line
-        """
-
-        try:
-            self.selected.pop()
-        except IndexError:
-            pass
-
-    def run(self, info) -> []:
-        """
-        Runs infinite loop until user commits selected corridor lines.
-
-        :param info: instance of InputInfo
-        """
-
-        cv2.namedWindow("select_corridors")
-        cv2.setMouseCallback("select_corridors", _mouse_callback, self)
-
-        while True:
-            image_copy = np.copy(self.base_image)
-
-            self.draw(image_copy)
-            cv2.imshow("select_corridors", image_copy)
-
-            key = cv2.waitKey(1)
-
-            if key == 13:
-                for line in self:
-                    line.draw(image_copy, params.COLOR_BLUE, params.CORRIDORS_LINE_SELECTOR_THICKNESS)
-                    cv2.imshow("select_corridors", image_copy)
-
-                key = cv2.waitKey(0)
-                if key == 13:
-                    cv2.destroyWindow("select_corridors")
-
-                    if len(self.selected) < 2:
-                        print("Not minimal number of lines selected. Please select at least 2 lines")
-                        continue
-                    else:
-                        return sorted(self.selected, key=lambda l: l.find_coordinate(y=info.height)[0])
-
-                if key == 8:
-                    self.clear()
-
-            if key == 8:
-                self.erase_last()

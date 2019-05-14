@@ -1,143 +1,21 @@
+"""
+InputInfo class definition
+"""
+from primitives.area import Area
+from primitives.coordinates import Coordinates
+from primitives.enums import CalibrationMode, Color
+from video_stream.video_info import VideoInfo
+
+__author__ = "Miroslav Karpisek"
+__email__ = "xkarpi05@stud.fit.vutbr.cz"
+__date__ = "14.5.2019"
+
 import cv2
 import numpy as np
-import params
+from primitives import constants
 
-from enum import Enum
-from bbox import Area, Coordinates
 from repositories.traffic_corridor_repository import TrafficCorridorRepository
 from repositories.traffic_light_repository import TrafficLightsRepository
-from pipeline.traffic_light_observer import Color
-
-
-class CalibrationMode(Enum):
-    """
-    Represents calibration mode. If it was done by user or auto.
-    """
-    AUTOMATIC = 0
-    LIGHTS_MANUAL = 1
-    CORRIDORS_MANUAL = 2
-    MANUAL = 3
-
-    def __str__(self):
-        return self.name.lower()
-
-
-class VideoInfo:
-    """
-    Class handles operations on opened file. It encapsulates API around opened video-stream.
-    """
-
-    def __init__(self, video_path):
-        """
-        :param video_path: path of input video stream
-        """
-
-        self._input = cv2.VideoCapture(video_path)
-        filename_with_extension = video_path.rsplit('/', 1)[1]
-        self._file_name = filename_with_extension.rsplit('.', 1)[0]
-
-        self._fps = self._input.get(cv2.CAP_PROP_FPS)
-        self._height = self._input.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        self._width = self._input.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self._resize = False
-
-        self._frame_count = int(self._input.get(cv2.CAP_PROP_FRAME_COUNT) / (int(self._fps / params.FRAME_LOADER_MAX_FPS) + 1))
-        self._ratio = self._height / self._width
-
-        if self._width > params.FRAME_LOADER_MAX_WIDTH:
-            self._width = int(params.FRAME_LOADER_MAX_WIDTH)
-            self._height = int(params.FRAME_LOADER_MAX_WIDTH * self._ratio)
-            self._resize = True
-
-    @property
-    def filename(self):
-        """
-        :return: opened input video filename
-        """
-
-        return self._file_name
-
-    @property
-    def ratio(self):
-        """
-        :return: width vs. height ratio of input video
-        """
-        return self._ratio
-
-    @property
-    def frame_count(self):
-        """
-        :return: frame count of opened video
-        """
-
-        return self._frame_count
-
-    @property
-    def height(self):
-        """
-        :return: height of frame in opened video
-        """
-
-        return int(self._height)
-
-    @property
-    def width(self) -> int:
-        """
-        :return: width of video frames
-        """
-
-        return int(self._width)
-
-    @property
-    def fps(self) -> int:
-        """
-        :return: frames per second of opened video
-        """
-
-        return int(self._fps)
-
-    def read(self, width=None):
-        """
-        Reads new frame from opened video.
-        If number of frames per second of video is higher then
-        specified by constant, it throws a number of them away.
-
-        :raise EOFError when end of input
-        :return: new frame
-        """
-
-        status, frame = self._input.read()
-
-        for _ in range(int(self.fps / params.FRAME_LOADER_MAX_FPS)):
-            status, frame = self._input.read()
-
-        if not status:
-            raise EOFError
-
-        if width is not None:
-            return cv2.resize(frame, (width, int(width * self.ratio)))
-        elif self._resize:
-            return cv2.resize(frame, (self._width, self._height))
-        else:
-            return frame
-
-    def reopen(self):
-        """
-        Sets the recording head to the first frame in input video
-        """
-
-        self._input.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-    def resize(self, width, height):
-        """
-        Re-sizes input frame size. Does not control if aspect ratio is same.
-
-        :param width: selected new width
-        :param height: selected new height
-        """
-
-        self._width = width
-        self._width = height
 
 
 class Info(VideoInfo):
@@ -165,7 +43,7 @@ class Info(VideoInfo):
         self._calibration_mode = CalibrationMode.AUTOMATIC
 
         self._tracker_start_area = Area(info=self,
-                                        top_left=Coordinates(0, self.height / 2),
+                                        top_left=Coordinates(0, self.height / 3),
                                         top_right=Coordinates(self.width, self.height / 2),
                                         bottom_right=Coordinates(self.width, self.height),
                                         bottom_left=Coordinates(0, self.height))
@@ -328,7 +206,7 @@ class Info(VideoInfo):
             for p in points:
                 self.vanishing_points[0].draw_line(image=image,
                                                    point=p,
-                                                   color=params.COLOR_VANISHING_DIRECTIONS[0],
+                                                   color=constants.COLOR_VANISHING_DIRECTIONS[0],
                                                    thickness=5)
         except IndexError:
             pass
@@ -362,7 +240,7 @@ class Info(VideoInfo):
         return self.traffic_lights_repository.draw(image)
 
     @staticmethod
-    def draw_syntetic_traffic_lights(image, lights_status):
+    def draw_synthetic_traffic_lights(image, lights_status):
         """
         Helper function for painting current detected light status on passed image
 
@@ -371,42 +249,48 @@ class Info(VideoInfo):
         :return: updated image
         """
 
-        color1 = params.COLOR_GRAY
-        color2 = params.COLOR_GRAY
-        color3 = params.COLOR_GRAY
+        color1 = constants.COLOR_GRAY
+        color2 = constants.COLOR_GRAY
+        color3 = constants.COLOR_GRAY
 
         if lights_status == Color.RED or lights_status == Color.RED_ORANGE:
-            color1 = params.COLOR_RED
+            color1 = constants.COLOR_RED
 
         if lights_status == Color.ORANGE or lights_status == Color.RED_ORANGE:
-            color2 = params.COLOR_ORANGE
+            color2 = constants.COLOR_ORANGE
 
         if lights_status == Color.GREEN:
-            color3 = params.COLOR_GREEN
+            color3 = constants.COLOR_GREEN
 
         cv2.rectangle(img=image,
                       pt1=(10, 10),
-                      pt2=(30, 70),
-                      color=params.COLOR_BLACK,
-                      thickness=params.FILL)
+                      pt2=(60, 145),
+                      color=constants.COLOR_BLACK,
+                      thickness=constants.FILL)
+
+        cv2.rectangle(img=image,
+                      pt1=(10, 10),
+                      pt2=(60, 145),
+                      color=constants.COLOR_WHITE,
+                      thickness=3)
 
         cv2.circle(img=image,
-                   center=(20, 20),
-                   radius=5,
+                   center=(35, 35),
+                   radius=15,
                    color=color1,
-                   thickness=params.FILL)
+                   thickness=constants.FILL)
 
         cv2.circle(img=image,
-                   center=(20, 40),
-                   radius=5,
+                   center=(35, 75),
+                   radius=15,
                    color=color2,
-                   thickness=params.FILL)
+                   thickness=constants.FILL)
 
         cv2.circle(img=image,
-                   center=(20, 60),
-                   radius=5,
+                   center=(35, 120),
+                   radius=15,
                    color=color3,
-                   thickness=params.FILL)
+                   thickness=constants.FILL)
 
         return image
 
